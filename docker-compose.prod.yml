@@ -52,7 +52,7 @@ services:
     ports:
       - "3000:3000"
     command: >
-      sh -c "./node_modules/.bin/prisma migrate deploy && node server.js"
+      sh -c "npx prisma migrate deploy && node server.js"
     networks:
       - portal-internal
       - coolify
