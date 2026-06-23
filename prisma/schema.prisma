@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  domain      String   @unique
+  logoUrl     String?
+  themeColors Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  guardians    GuardianUser[]
+  transactions Transaction[]
+}
+
+model GuardianUser {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String    @db.Uuid
+  rut              String
+  email            String?
+  passwordHash     String
+  lastLogin        DateTime?
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  createdAt        DateTime  @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  transactions Transaction[]
+
+  @@unique([tenantId, rut])
+}
+
+model Transaction {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @db.Uuid
+  guardianId        String   @db.Uuid
+  buyOrder          String   @unique
+  sessionId         String?
+  tokenWs           String?  @unique
+  amount            Int
+  status            String   @default("PENDING") // PENDING, AUTHORIZED, REJECTED, FAILED
+  authorizationCode String?
+  edupayPayload     Json? // IDs de las cuotas/deudas pagadas en EduPay
+  edupaySynced      Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  guardian GuardianUser @relation(fields: [guardianId], references: [id])
+}

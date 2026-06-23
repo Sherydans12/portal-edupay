@@ -1,0 +1,153 @@
+"use client";
+
+import { Loader2, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
+import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import { BrandLogo } from "@/components/BrandLogo";
+import { DEMO_CREDENTIALS } from "@/data/mock";
+
+type LoginFormProps = {
+  onLogin?: () => void;
+};
+
+export function LoginForm({ onLogin }: LoginFormProps) {
+  const router = useRouter();
+  const [rut, setRut] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setIsSubmitting(true);
+
+    const res = await signIn("credentials", {
+      rut,
+      password,
+      redirect: false,
+    });
+
+    setIsSubmitting(false);
+
+    if (res?.error) {
+      toast.error("Credenciales incorrectas");
+      return;
+    }
+
+    toast.success("Bienvenido");
+    if (onLogin) {
+      onLogin();
+      return;
+    }
+
+    router.push("/");
+    router.refresh();
+  }
+
+  return (
+    <main className="min-h-screen bg-tenant-bg px-4 py-8">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="hidden lg:block">
+          <BrandLogo />
+          <div className="mt-12 max-w-xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-tenant-secondary">
+              Portal de Pagos
+            </p>
+            <h1 className="mt-4 text-5xl font-black leading-tight text-tenant-primary">
+              Una experiencia clara para revisar y pagar mensualidades.
+            </h1>
+            <p className="mt-5 text-lg leading-8 text-slate-600">
+              Mockup funcional preparado para conectar EduPay como fuente de
+              datos y Transbank Webpay Plus como pasarela de pago.
+            </p>
+          </div>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="mx-auto w-full max-w-md rounded-[8px] border border-slate-200 bg-white p-6 shadow-2xl shadow-tenant-primary/10 sm:p-8"
+        >
+          <div className="mb-8 flex justify-center lg:hidden">
+            <BrandLogo />
+          </div>
+          <div className="mb-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-tenant-secondary">
+              Acceso apoderados
+            </p>
+            <h2 className="mt-3 text-3xl font-black text-tenant-primary">
+              Iniciar sesión
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Ingresa con las credenciales de prueba para presentar el flujo.
+            </p>
+          </div>
+
+          <label className="block text-sm font-semibold text-slate-700">
+            RUT del apoderado
+            <span className="mt-2 flex h-12 items-center gap-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 focus-within:border-tenant-primary focus-within:bg-white focus-within:ring-4 focus-within:ring-tenant-primary/10">
+              <UserRound className="h-5 w-5 text-slate-400" aria-hidden />
+              <input
+                value={rut}
+                onChange={(event) => setRut(event.target.value)}
+                placeholder={DEMO_CREDENTIALS.rut}
+                className="h-full w-full bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-400"
+              />
+            </span>
+          </label>
+
+          <label className="mt-5 block text-sm font-semibold text-slate-700">
+            Contraseña
+            <span className="mt-2 flex h-12 items-center gap-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 focus-within:border-tenant-primary focus-within:bg-white focus-within:ring-4 focus-within:ring-tenant-primary/10">
+              <LockKeyhole className="h-5 w-5 text-slate-400" aria-hidden />
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="demo123"
+                type="password"
+                className="h-full w-full bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-400"
+              />
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-tenant-primary px-4 text-base font-bold text-white shadow-lg shadow-tenant-primary/20 transition hover:bg-tenant-primary/90 focus:outline-none focus:ring-4 focus:ring-tenant-primary/20 disabled:cursor-wait disabled:bg-slate-400 disabled:shadow-none"
+          >
+            {isSubmitting ? (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+            ) : (
+              <ShieldCheck className="h-5 w-5" aria-hidden />
+            )}
+            {isSubmitting ? "Validando acceso" : "Entrar al portal"}
+          </button>
+
+          <div className="mt-6 space-y-3 text-center text-sm font-bold">
+            <Link
+              href="/register"
+              className="block text-tenant-primary transition hover:text-tenant-primary/80"
+            >
+              ¿Primer acceso? Crea tu contraseña aquí
+            </Link>
+            <Link
+              href="/forgot-password"
+              className="block text-slate-600 transition hover:text-tenant-primary"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+
+          <div className="mt-6 rounded-[8px] border border-tenant-secondary/40 bg-tenant-secondary/10 p-4 text-sm leading-6 text-slate-700">
+            <span className="font-bold text-tenant-primary">
+              Credenciales demo:
+            </span>{" "}
+            RUT {DEMO_CREDENTIALS.rut} · Contraseña {DEMO_CREDENTIALS.password}
+          </div>
+        </form>
+      </section>
+    </main>
+  );
+}

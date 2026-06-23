@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  postgres-portal:
+    image: postgres:16-alpine
+    container_name: postgres-portal
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - portal_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - portal-internal
+
+  redis-portal:
+    image: redis:7-alpine
+    container_name: redis-portal
+    restart: always
+    volumes:
+      - portal_redis_data:/data
+    networks:
+      - portal-internal
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portal-edupay-web
+    restart: always
+    depends_on:
+      postgres-portal:
+        condition: service_healthy
+      redis-portal:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      WEBPAY_ENVIRONMENT: ${WEBPAY_ENVIRONMENT}
+      EMAIL_FROM: ${EMAIL_FROM}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis-portal:6379}
+    ports:
+      - "3000:3000"
+    command: >
+      sh -c "./node_modules/.bin/prisma migrate deploy && node server.js"
+    networks:
+      - portal-internal
+      - coolify
+
+volumes:
+  portal_pg_data:
+  portal_redis_data:
+
+networks:
+  portal-internal:
+    name: portal-edupay-internal
+  coolify:
+    external: true
