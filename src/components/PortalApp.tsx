@@ -11,39 +11,38 @@ import {
 import { CertificatesManager } from "@/components/dashboard/CertificatesManager";
 import { PaymentHistory } from "@/components/dashboard/PaymentHistory";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import type { EdupayStatementResponse } from "@/lib/edupay";
 import type { Guardian, Installment } from "@/types/payments";
 import type { ActiveSection } from "@/types/portal";
 
 type PortalAppProps = {
-  guardian: Guardian;
+  statement: EdupayStatementResponse;
 };
 
-export function PortalApp({ guardian }: PortalAppProps) {
-  const [portalData, setPortalData] = useState<Guardian>(() => guardian);
+export function PortalApp({ statement }: PortalAppProps) {
+  const guardian: Guardian = {
+    ...statement.guardian,
+    students: statement.students,
+  };
   const { status } = useSession();
   const [activeSection, setActiveSection] = useState<ActiveSection>("account");
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     guardian.students[0]?.id ?? "",
   );
-  const [selectedIds, setSelectedIds] = useState<string[]>(() =>
-    getPayableInstallmentIds(guardian.students[0]?.installments ?? []),
-  );
+  const [selectedCuotas, setSelectedCuotas] = useState<number[]>([]);
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
 
   const selectedStudent =
-    portalData.students.find((student) => student.id === selectedStudentId) ??
-    portalData.students[0];
+    guardian.students.find((student) => student.id === selectedStudentId) ??
+    guardian.students[0];
 
-  function resetPaymentFlow(nextSelectedIds: string[] = []) {
-    setSelectedIds(nextSelectedIds);
+  function resetPaymentFlow() {
+    setSelectedCuotas([]);
     setIsCreatingTransaction(false);
   }
 
   function handleSelectStudent(studentId: string) {
-    const student = portalData.students.find((item) => item.id === studentId);
-
     setSelectedStudentId(studentId);
-    resetPaymentFlow(getPayableInstallmentIds(student?.installments ?? []));
   }
 
   function toggleInstallment(installment: Installment) {
@@ -51,7 +50,7 @@ export function PortalApp({ guardian }: PortalAppProps) {
       return;
     }
 
-    setSelectedIds((current) =>
+    setSelectedCuotas((current) =>
       current.includes(installment.id)
         ? current.filter((id) => id !== installment.id)
         : [...current, installment.id],
@@ -59,13 +58,17 @@ export function PortalApp({ guardian }: PortalAppProps) {
   }
 
   async function startWebpayTransaction() {
-    if (!selectedStudent || isCreatingTransaction) {
+    if (isCreatingTransaction) {
       return;
     }
 
-    const selectedInstallments = selectedStudent.installments.filter((item) =>
-      selectedIds.includes(item.id),
-    );
+    const selectedInstallments = guardian.students
+      .flatMap((student) => student.installments)
+      .filter(
+        (installment) =>
+          installment.status !== "PAGADO" &&
+          selectedCuotas.includes(installment.id),
+      );
     const selectedTotal = getDebt(selectedInstallments);
 
     if (selectedTotal === 0) {
@@ -82,7 +85,7 @@ export function PortalApp({ guardian }: PortalAppProps) {
         },
         body: JSON.stringify({
           amount: selectedTotal,
-          sessionId: `portal-${selectedStudent.id}-${Date.now()}`,
+          sessionId: `portal-multi-${Date.now()}`,
           edupayPayload: selectedInstallments.map((installment) => installment.id),
         }),
       });
@@ -116,10 +119,9 @@ export function PortalApp({ guardian }: PortalAppProps) {
   }
 
   function handleLogout() {
-    setPortalData(guardian);
     setSelectedStudentId(guardian.students[0]?.id ?? "");
     setActiveSection("account");
-    resetPaymentFlow(getPayableInstallmentIds(guardian.students[0]?.installments ?? []));
+    resetPaymentFlow();
     void signOut({ callbackUrl: "/login" });
   }
 
@@ -129,22 +131,16 @@ export function PortalApp({ guardian }: PortalAppProps) {
 
   return (
     <DashboardLayout
-      guardian={portalData}
+      guardian={guardian}
       activeSection={activeSection}
       onSectionChange={setActiveSection}
       onLogout={handleLogout}
     >
       <section className="mx-auto max-w-6xl">
-        <StudentSelector
-          students={portalData.students}
-          selectedStudentId={selectedStudent?.id ?? ""}
-          onSelectStudent={handleSelectStudent}
-        />
-
-        {selectedStudent && activeSection === "account" && (
+        {activeSection === "account" && (
           <AccountStatement
-            student={selectedStudent}
-            selectedIds={selectedIds}
+            statement={statement}
+            selectedCuotas={selectedCuotas}
             isCreatingTransaction={isCreatingTransaction}
             onToggleInstallment={toggleInstallment}
             onStartWebpayTransaction={startWebpayTransaction}
@@ -152,24 +148,25 @@ export function PortalApp({ guardian }: PortalAppProps) {
         )}
 
         {selectedStudent && activeSection === "history" && (
-          <PaymentHistory student={selectedStudent} />
+          <>
+            <StudentSelector
+              students={guardian.students}
+              selectedStudentId={selectedStudent.id}
+              onSelectStudent={handleSelectStudent}
+            />
+            <PaymentHistory student={selectedStudent} />
+          </>
         )}
 
         {activeSection === "certificates" && (
           <CertificatesManager
-            students={portalData.students}
-            guardianRut={portalData.rut}
+            students={guardian.students}
+            guardianRut={guardian.rut}
           />
         )}
       </section>
     </DashboardLayout>
   );
-}
-
-function getPayableInstallmentIds(installments: Installment[]) {
-  return installments
-    .filter((installment) => installment.status !== "PAGADO")
-    .map((installment) => installment.id);
 }
 
 function PortalSkeleton() {

@@ -13,8 +13,6 @@ export function PaymentHistory({ student }: PaymentHistoryProps) {
   const paidInstallments = student.installments.filter(
     (installment) => installment.status === "PAGADO",
   );
-  const tenantName = "Colegio Conquistadores";
-
   return (
     <section className="rounded-[8px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -83,11 +81,11 @@ export function PaymentHistory({ student }: PaymentHistoryProps) {
               type="button"
               onClick={() =>
                 generateReceipt(
-                  installment.purchaseOrder ?? installment.id,
                   installment.amount,
+                  installment.purchaseOrder ?? String(installment.id),
+                  installment.authorizationCode ?? null,
                   installment.paidAt ?? installment.dueDate,
-                  student.name,
-                  tenantName,
+                  true,
                 )
               }
               className="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-tenant-primary/30 bg-white px-3 text-sm font-bold text-tenant-primary transition hover:bg-tenant-primary hover:text-white md:h-10"

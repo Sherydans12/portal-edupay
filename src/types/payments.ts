@@ -1,23 +1,12 @@
-export type InstallmentStatus = "PAGADO" | "VENCIDO" | "POR_VENCER";
+import type {
+  EdupayInstallment,
+  EdupayInstallmentStatus,
+  EdupayStudent,
+} from "@/lib/edupay";
 
-export type Installment = {
-  id: string;
-  month: string;
-  dueDate: string;
-  status: InstallmentStatus;
-  amount: number;
-  paidAt?: string;
-  purchaseOrder?: string;
-  authorizationCode?: string;
-};
-
-export type Student = {
-  id: string;
-  name: string;
-  course: string;
-  accountNumber: string;
-  installments: Installment[];
-};
+export type InstallmentStatus = EdupayInstallmentStatus;
+export type Installment = EdupayInstallment;
+export type Student = EdupayStudent;
 
 export type Guardian = {
   id: string;

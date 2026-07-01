@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
+import { getEdupayTenantId } from "@/lib/edupay";
 import prisma from "@/lib/prisma";
 import { webpayTransaction } from "@/lib/transbank";
 
@@ -12,8 +13,13 @@ type InitWebpayBody = {
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
+  const tenantId = getEdupayTenantId();
 
-  if (!session?.user?.id || !session.user.tenantId) {
+  if (
+    !session?.user?.id ||
+    !session.user.tenantId ||
+    session.user.tenantId !== tenantId
+  ) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -26,7 +32,9 @@ export async function POST(request: Request) {
     typeof body.sessionId !== "string" ||
     body.sessionId.trim().length === 0 ||
     !Array.isArray(body.edupayPayload) ||
-    !body.edupayPayload.every((id) => typeof id === "string")
+    !body.edupayPayload.every(
+      (id) => typeof id === "number" && Number.isInteger(id),
+    )
   ) {
     return NextResponse.json(
       { error: "Datos de pago inválidos" },
@@ -37,7 +45,7 @@ export async function POST(request: Request) {
   const guardian = await prisma.guardianUser.findFirst({
     where: {
       id: session.user.id,
-      tenantId: session.user.tenantId,
+      tenantId,
     },
     select: {
       id: true,
@@ -61,7 +69,7 @@ export async function POST(request: Request) {
 
   await prisma.transaction.create({
     data: {
-      tenantId: guardian.tenantId,
+      tenantId,
       guardianId: guardian.id,
       buyOrder,
       sessionId: body.sessionId,

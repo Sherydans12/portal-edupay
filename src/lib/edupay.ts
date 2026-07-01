@@ -1,10 +1,69 @@
-import { mockGuardian, mockGuardian2, MOCK_GUARDIAN_MAP } from "@/data/mock";
-import type { Guardian } from "@/types/payments";
+export type EdupayInstallmentStatus = "PAGADO" | "VENCIDO" | "POR_VENCER";
 
-const REGISTERED_GUARDIAN_RUTS = new Set([
-  normalizeRut(mockGuardian.rut),
-  normalizeRut(mockGuardian2.rut),
-]);
+export interface EdupayInstallment {
+  id: number;
+  month: string;
+  dueDate: string;
+  status: EdupayInstallmentStatus;
+  amount: number;
+  paidAt?: string;
+  purchaseOrder?: string;
+  authorizationCode?: string;
+}
+
+export interface EdupayStudent {
+  id: string;
+  name: string;
+  course: string;
+  accountNumber: string;
+  installments: EdupayInstallment[];
+}
+
+export interface EdupayStatementResponse {
+  guardian: {
+    id: string;
+    name: string;
+    rut: string;
+    email: string;
+  };
+  students: EdupayStudent[];
+}
+
+export interface EdupayPaymentSyncResponse {
+  synced: boolean;
+}
+
+type GuardianExistsResponse = {
+  exists: boolean;
+};
+
+type EdupayApiEnvelope<T> = {
+  data: T;
+};
+
+type EdupayRawStatementResponse = {
+  guardian: {
+    rut: string;
+    name: string;
+  };
+  students: Array<{
+    id: number;
+    rut: string;
+    name: string;
+    course: {
+      id: number;
+      name: string;
+    };
+    installments: Array<{
+      id: number;
+      month: string;
+      amount: number;
+      paidAmount: number;
+      outstandingAmount: number;
+      status: "PAGADO" | "VENCIDO" | "PENDIENTE";
+    }>;
+  }>;
+};
 
 export function normalizeRut(rut: string) {
   return rut.replace(/[.\s-]/g, "").toUpperCase();
@@ -24,18 +83,142 @@ export function formatGuardianRut(rut: string) {
   return `${formattedBody}-${verifier}`;
 }
 
-export async function getGuardianPortalData(rut?: string): Promise<Guardian> {
-  // Swap this return for a real EduPay request when the integration is ready.
-  // Example: return fetch(`${process.env.EDUPAY_API_URL}/guardians/me`).then((r) => r.json());
-  if (rut) {
-    const formatted = formatGuardianRut(rut);
-    const match = MOCK_GUARDIAN_MAP[formatted];
-    if (match) return match;
+export function getEdupayTenantId(tenantId?: string) {
+  const resolvedTenantId = tenantId ?? process.env.NEXT_PUBLIC_TENANT_ID;
+
+  if (!resolvedTenantId) {
+    throw new Error("NEXT_PUBLIC_TENANT_ID is not defined");
   }
-  return mockGuardian;
+
+  return resolvedTenantId;
+}
+
+function getEdupayConfig(tenantId?: string) {
+  const apiUrl = process.env.EDUPAY_API_URL?.replace(/\/$/, "");
+  const apiToken = process.env.EDUPAY_API_TOKEN;
+  const resolvedTenantId = getEdupayTenantId(tenantId);
+
+  if (!apiUrl || !apiToken) {
+    throw new Error("EDUPAY_API_URL y EDUPAY_API_TOKEN deben estar configuradas");
+  }
+
+  return { apiUrl, apiToken, tenantId: resolvedTenantId };
+}
+
+async function edupayFetch<T>(
+  path: string,
+  init?: RequestInit,
+  tenantId?: string,
+): Promise<T> {
+  const config = getEdupayConfig(tenantId);
+  const response = await fetch(`${config.apiUrl}${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${config.apiToken}`,
+      "x-tenant-id": config.tenantId,
+      ...init?.headers,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `EduPay respondió ${response.status} al consultar ${path}`,
+    );
+  }
+
+  const payload = (await response.json()) as T | EdupayApiEnvelope<T>;
+
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "data" in payload
+  ) {
+    return payload.data;
+  }
+
+  return payload;
 }
 
 export async function verifyGuardianExists(rut: string): Promise<boolean> {
-  // TODO: Llamar a API real de EduPay.
-  return REGISTERED_GUARDIAN_RUTS.has(normalizeRut(rut));
+  const response = await edupayFetch<GuardianExistsResponse>(
+    `/api/v1/portal/guardian/${encodeURIComponent(rut)}`,
+  );
+
+  return response.exists;
+}
+
+export function getGuardianStatement(
+  rut: string,
+): Promise<EdupayStatementResponse> {
+  return edupayFetch<EdupayRawStatementResponse>(
+    `/api/v1/portal/guardian/${encodeURIComponent(rut)}/statement`,
+  ).then((statement) => ({
+    guardian: {
+      id: statement.guardian.rut,
+      name: statement.guardian.name,
+      rut: statement.guardian.rut,
+      email: "",
+    },
+    students: statement.students.map((student) => ({
+      id: String(student.id),
+      name: student.name,
+      course: student.course.name,
+      accountNumber: student.rut,
+      installments: student.installments.map((installment) => ({
+        id: installment.id,
+        month: formatInstallmentMonth(installment.month),
+        dueDate: `${installment.month}-10`,
+        status:
+          installment.status === "PENDIENTE"
+            ? "POR_VENCER"
+            : installment.status,
+        amount:
+          installment.status === "PAGADO"
+            ? installment.amount
+            : installment.outstandingAmount,
+      })),
+    })),
+  }));
+}
+
+export function syncPaymentWithEduPay(
+  buyOrder: string,
+  amount: number,
+  paymentDate: string,
+  installmentsIds: number[],
+  tenantId?: string,
+): Promise<EdupayPaymentSyncResponse> {
+  return edupayFetch<EdupayPaymentSyncResponse>(
+    "/api/v1/portal/payments/sync",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        buyOrder,
+        amount,
+        paymentDate,
+        installmentsIds,
+      }),
+    },
+    tenantId,
+  );
+}
+
+function formatInstallmentMonth(month: string) {
+  const date = new Date(`${month}-01T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return month;
+  }
+
+  const formatted = new Intl.DateTimeFormat("es-CL", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }

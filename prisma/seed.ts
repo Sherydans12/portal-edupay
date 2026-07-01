@@ -2,13 +2,38 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+const tenantId = process.env.NEXT_PUBLIC_TENANT_ID ?? "colegio-pruebas";
 
 async function main() {
-  // ── 1. Tenant ──────────────────────────────────────────────────
+  // ── 1. Usuario administrador ───────────────────────────────────
+  const adminPassword = await bcrypt.hash("base2026", 10);
+  const admin = await prisma.adminUser.upsert({
+    where: { email: "admin@baselogic.cl" },
+    update: {
+      name: "BaseLogic Admin",
+      password: adminPassword,
+      role: "SUPERADMIN",
+    },
+    create: {
+      email: "admin@baselogic.cl",
+      password: adminPassword,
+      name: "BaseLogic Admin",
+      role: "SUPERADMIN",
+    },
+  });
+
+  console.log(`✅ Super Admin: ${admin.email}`);
+
+  // ── 2. Tenant ──────────────────────────────────────────────────
   const tenant = await prisma.tenant.upsert({
     where: { domain: "conquistadores.edupay.cl" },
-    update: {},
+    update: {
+      id: tenantId,
+      name: "Colegio Conquistadores",
+      isActive: true,
+    },
     create: {
+      id: tenantId,
       name: "Colegio Conquistadores",
       domain: "conquistadores.edupay.cl",
       logoUrl: "/logo.png",
@@ -22,7 +47,7 @@ async function main() {
 
   console.log(`✅ Tenant: ${tenant.name} (${tenant.id})`);
 
-  // ── 2. Apoderados ──────────────────────────────────────────────
+  // ── 3. Apoderados ──────────────────────────────────────────────
   const hash1 = await bcrypt.hash("demo123", 10);
   const hash2 = await bcrypt.hash("test456", 10);
 
@@ -58,7 +83,7 @@ async function main() {
 
   console.log(`✅ Apoderado 2: ${guardian2.rut} / contraseña: test456`);
 
-  // ── 3. Transacciones de ejemplo ────────────────────────────────
+  // ── 4. Transacciones de ejemplo ────────────────────────────────
   const transactions = [
     {
       tenantId: tenant.id,
@@ -164,6 +189,7 @@ async function main() {
   console.log("\n─────────────────────────────────────────────");
   console.log("  CREDENCIALES DE PRUEBA");
   console.log("─────────────────────────────────────────────");
+  console.log("  Super Admin: admin@baselogic.cl / Contraseña: base2026");
   console.log("  Usuario 1: RUT 12.345.678-9 / Contraseña: demo123");
   console.log("    └─ Alumnos: Martina Fuentes (3°Medio) y Tomás Fuentes (5°Básico)");
   console.log("  Usuario 2: RUT 11.111.111-1 / Contraseña: test456");

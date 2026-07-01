@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Colegio Conquistadores | Portal de Pagos",
-  description: "Mockup funcional del portal de pagos para apoderados.",
+  description: "Portal de pagos para apoderados.",
 };
 
 const currentTenant = tenants["conquistadores"];

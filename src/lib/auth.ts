@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { formatGuardianRut } from "@/lib/edupay";
+import { formatGuardianRut, getEdupayTenantId } from "@/lib/edupay";
 import prisma from "@/lib/prisma";
 
 export const authOptions: NextAuthOptions = {
@@ -12,59 +12,87 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credenciales",
       credentials: {
-        rut: { label: "RUT", type: "text" },
+        rut: { label: "RUT o correo electrónico", type: "text" },
         password: { label: "Contraseña", type: "password" },
       },
       async authorize(credentials) {
-        const rawRut = credentials?.rut?.trim();
-        const rut = rawRut ? formatGuardianRut(rawRut) : "";
+        const identifier = credentials?.rut?.trim() ?? "";
         const password = credentials?.password;
 
-        if (!rut || !password) {
+        if (!identifier || !password) {
           return null;
         }
 
-        const tenant = await prisma.tenant.findFirst({
-          where: { isActive: true },
-          orderBy: { createdAt: "asc" },
-        });
+        const isEmail = identifier.includes("@");
+        const rut = isEmail ? "" : formatGuardianRut(identifier);
+        const configuredTenantId = process.env.NEXT_PUBLIC_TENANT_ID;
+        const guardian = configuredTenantId
+          ? await prisma.guardianUser.findFirst({
+              where: {
+                tenantId: configuredTenantId,
+                tenant: {
+                  is: {
+                    isActive: true,
+                  },
+                },
+                ...(isEmail
+                  ? {
+                      email: {
+                        equals: identifier,
+                        mode: "insensitive" as const,
+                      },
+                    }
+                  : { rut }),
+              },
+            })
+          : null;
 
-        if (!tenant) {
+        if (guardian) {
+          const tenantId = getEdupayTenantId();
+          const isPasswordValid = await bcrypt.compare(
+            password,
+            guardian.passwordHash,
+          );
+
+          if (!isPasswordValid) {
+            return null;
+          }
+
+          await prisma.guardianUser.update({
+            where: { id: guardian.id },
+            data: { lastLogin: new Date() },
+          });
+
+          return {
+            id: guardian.id,
+            tenantId,
+            rut: guardian.rut,
+            name: guardian.rut,
+            email: guardian.email,
+            role: "GUARDIAN",
+          };
+        }
+
+        if (!isEmail) {
+          getEdupayTenantId();
           return null;
         }
 
-        const guardian = await prisma.guardianUser.findUnique({
+        const admin = await prisma.adminUser.findUnique({
           where: {
-            tenantId_rut: {
-              tenantId: tenant.id,
-              rut,
-            },
+            email: identifier.toLowerCase(),
           },
         });
 
-        if (!guardian) {
+        if (!admin || !(await bcrypt.compare(password, admin.password))) {
           return null;
         }
-
-        const isPasswordValid = await bcrypt.compare(
-          password,
-          guardian.passwordHash,
-        );
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        await prisma.guardianUser.update({
-          where: { id: guardian.id },
-          data: { lastLogin: new Date() },
-        });
 
         return {
-          id: guardian.id,
-          tenantId: guardian.tenantId,
-          rut: guardian.rut,
-          name: guardian.rut,
+          id: admin.id,
+          email: admin.email,
+          name: admin.name,
+          role: admin.role,
         };
       },
     }),
@@ -75,6 +103,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.tenantId = user.tenantId;
         token.rut = user.rut;
+        token.role = user.role;
       }
 
       return token;
@@ -84,6 +113,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.tenantId = token.tenantId;
         session.user.rut = token.rut;
+        session.user.role = token.role;
       }
 
       return session;

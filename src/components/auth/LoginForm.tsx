@@ -3,11 +3,10 @@
 import { Loader2, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { BrandLogo } from "@/components/BrandLogo";
-import { DEMO_CREDENTIALS } from "@/data/mock";
 
 type LoginFormProps = {
   onLogin?: () => void;
@@ -15,7 +14,7 @@ type LoginFormProps = {
 
 export function LoginForm({ onLogin }: LoginFormProps) {
   const router = useRouter();
-  const [rut, setRut] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,7 +24,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     setIsSubmitting(true);
 
     const res = await signIn("credentials", {
-      rut,
+      rut: identifier,
       password,
       redirect: false,
     });
@@ -43,7 +42,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       return;
     }
 
-    router.push("/");
+    const session = await getSession();
+    router.push(session?.user?.role === "SUPERADMIN" ? "/admin" : "/");
     router.refresh();
   }
 
@@ -60,8 +60,8 @@ export function LoginForm({ onLogin }: LoginFormProps) {
               Una experiencia clara para revisar y pagar mensualidades.
             </h1>
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              Mockup funcional preparado para conectar EduPay como fuente de
-              datos y Transbank Webpay Plus como pasarela de pago.
+              Consulta tu estado de cuenta institucional y paga de forma segura
+              con Transbank Webpay Plus.
             </p>
           </div>
         </div>
@@ -75,24 +75,24 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           </div>
           <div className="mb-8">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-tenant-secondary">
-              Acceso apoderados
+              Acceso seguro
             </p>
             <h2 className="mt-3 text-3xl font-black text-tenant-primary">
               Iniciar sesión
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Ingresa con las credenciales de prueba para presentar el flujo.
+              Ingresa como apoderado o miembro autorizado del equipo.
             </p>
           </div>
 
           <label className="block text-sm font-semibold text-slate-700">
-            RUT del apoderado
+            RUT o correo electrónico
             <span className="mt-2 flex h-12 items-center gap-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 focus-within:border-tenant-primary focus-within:bg-white focus-within:ring-4 focus-within:ring-tenant-primary/10">
               <UserRound className="h-5 w-5 text-slate-400" aria-hidden />
               <input
-                value={rut}
-                onChange={(event) => setRut(event.target.value)}
-                placeholder={DEMO_CREDENTIALS.rut}
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                placeholder="12.345.678-9 o nombre@empresa.cl"
                 className="h-full w-full bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-400"
               />
             </span>
@@ -105,7 +105,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="demo123"
+                placeholder="Tu contraseña"
                 type="password"
                 className="h-full w-full bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-400"
               />
@@ -140,12 +140,6 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             </Link>
           </div>
 
-          <div className="mt-6 rounded-[8px] border border-tenant-secondary/40 bg-tenant-secondary/10 p-4 text-sm leading-6 text-slate-700">
-            <span className="font-bold text-tenant-primary">
-              Credenciales demo:
-            </span>{" "}
-            RUT {DEMO_CREDENTIALS.rut} · Contraseña {DEMO_CREDENTIALS.password}
-          </div>
         </form>
       </section>
     </main>

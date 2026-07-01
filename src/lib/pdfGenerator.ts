@@ -1,5 +1,4 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 const locale = "es-CL";
 
@@ -78,47 +77,104 @@ export function generateCertificate(
 }
 
 export function generateReceipt(
-  paymentId: string,
   amount: number,
-  date: string,
-  studentName: string,
-  tenantName: string,
+  buyOrder: string,
+  authorizationCode: string | null,
+  paymentDate: string,
+  isAuthorized: boolean,
 ) {
   const doc = new jsPDF();
   const issuedAt = new Intl.DateTimeFormat(locale, {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(date));
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "America/Santiago",
+  }).format(new Date(paymentDate));
+  const authCode = authorizationCode ?? "No disponible";
+  const primaryColor: [number, number, number] = isAuthorized
+    ? [15, 118, 110]
+    : [190, 18, 60];
+  const statusBackground: [number, number, number] = isAuthorized
+    ? [236, 253, 245]
+    : [255, 241, 242];
+  const statusBorder: [number, number, number] = isAuthorized
+    ? [167, 243, 208]
+    : [254, 205, 211];
 
+  doc.setFillColor(...primaryColor);
+  doc.roundedRect(15, 15, 180, 48, 4, 4, "F");
+
+  doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("Comprobante de Pago", 105, 28, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text(tenantName, 105, 38, { align: "center" });
+  doc.text("COLEGIO CONQUISTADORES", 25, 31);
+  doc.setFontSize(22);
+  doc.text("Comprobante de pago", 25, 45);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("Pago procesado mediante Webpay Plus", 25, 54);
 
+  doc.setFillColor(...statusBackground);
+  doc.setDrawColor(...statusBorder);
+  doc.roundedRect(15, 72, 180, 25, 4, 4, "FD");
+  doc.setTextColor(...primaryColor);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(`Orden de pago: ${paymentId}`, 20, 58);
-  doc.text(`Fecha de pago: ${issuedAt}`, 20, 68);
-  doc.text(`Alumno(a): ${studentName}`, 20, 78);
-
-  autoTable(doc, {
-    startY: 94,
-    head: [["Concepto", "Monto"]],
-    body: [["Pago de mensualidad", formatCurrency(amount)]],
-    foot: [["Total pagado", formatCurrency(amount)]],
-    theme: "grid",
-    headStyles: { fillColor: [27, 94, 124] },
-    footStyles: { fillColor: [240, 249, 255], textColor: [15, 23, 42] },
-  });
-
+  doc.text(isAuthorized ? "Pago autorizado" : "Pago no completado", 25, 83);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
   doc.text(
-    "Gracias por mantener sus pagos al dia. Conserve este comprobante como respaldo.",
-    20,
-    145,
+    isAuthorized
+      ? "Transbank confirmó correctamente esta operación."
+      : "Transbank no autorizó esta operación.",
+    25,
+    90,
   );
 
-  doc.save(`comprobante_pago_${safeFilePart(paymentId)}.pdf`);
+  const rows = [
+    ["Fecha", issuedAt],
+    ["Medio de pago", "Webpay Plus"],
+    ["Orden de compra", buyOrder],
+    ["Código de autorización", authCode],
+  ];
+
+  let y = 112;
+  rows.forEach(([label, value]) => {
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(label, 20, y);
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.text(value, 190, y, { align: "right" });
+
+    doc.setDrawColor(226, 232, 240);
+    doc.line(20, y + 6, 190, y + 6);
+    y += 22;
+  });
+
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(15, 202, 180, 35, 4, 4, "F");
+  doc.setTextColor(71, 85, 105);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("MONTO TOTAL", 25, 216);
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(20);
+  doc.text(formatCurrency(amount), 185, 222, { align: "right" });
+
+  doc.setTextColor(100, 116, 139);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(
+    "Conserva este comprobante como respaldo de tu pago.",
+    105,
+    257,
+    { align: "center" },
+  );
+  doc.text("Portal de Pagos - Colegio Conquistadores", 105, 264, {
+    align: "center",
+  });
+
+  doc.save(`comprobante_pago_${safeFilePart(buyOrder)}.pdf`);
 }

@@ -1,0 +1,53 @@
+
+> pagos-conquistadores-app@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.236.106.48:3000
+- Environments: .env
+✓ Ready in 1606ms
+
+ GET /login 200 in 695ms (next.js: 352ms, application-code: 343ms)
+ GET /login 200 in 192ms (next.js: 11ms, application-code: 181ms)
+ GET /logo.png 404 in 340ms (next.js: 101ms, application-code: 239ms)
+ GET /logo.png 404 in 320ms (next.js: 13ms, application-code: 307ms)
+ GET /api/auth/session 200 in 1787ms (next.js: 1719ms, application-code: 68ms)
+ GET /api/auth/providers 200 in 52ms (next.js: 26ms, application-code: 26ms)
+ GET /api/auth/csrf 200 in 18ms (next.js: 5ms, application-code: 13ms)
+ POST /api/auth/callback/credentials 200 in 216ms (next.js: 3ms, application-code: 213ms)
+ GET /api/auth/session 200 in 17ms (next.js: 3ms, application-code: 14ms)
+ GET /api/auth/session 200 in 42ms (next.js: 4ms, application-code: 38ms)
+ GET / 200 in 432ms (next.js: 71ms, proxy.ts: 146ms, application-code: 215ms)
+ GET / 200 in 209ms (next.js: 9ms, proxy.ts: 27ms, application-code: 173ms)
+ GET /logo.png 404 in 157ms (next.js: 12ms, application-code: 145ms)
+ GET /logo.png 404 in 164ms (next.js: 72ms, application-code: 92ms)
+ GET /api/auth/session 200 in 128ms (next.js: 43ms, application-code: 86ms)
+ GET /api/auth/session 200 in 52ms (next.js: 22ms, application-code: 30ms)
+ GET /api/auth/session 200 in 56ms (next.js: 30ms, application-code: 26ms)
+ GET /api/auth/session 200 in 31ms (next.js: 16ms, application-code: 16ms)
+ GET /api/auth/session 200 in 39ms (next.js: 12ms, application-code: 28ms)
+ GET /api/auth/session 200 in 41ms (next.js: 15ms, application-code: 26ms)
+ GET /api/auth/session 200 in 28ms (next.js: 11ms, application-code: 17ms)
+ GET /api/auth/session 200 in 38ms (next.js: 13ms, application-code: 25ms)
+ GET /api/auth/session 200 in 26ms (next.js: 12ms, application-code: 14ms)
+ GET /api/auth/session 200 in 52ms (next.js: 13ms, application-code: 39ms)
+ GET /api/auth/session 200 in 25ms (next.js: 12ms, application-code: 13ms)
+ GET / 200 in 793ms (next.js: 27ms, proxy.ts: 6ms, application-code: 760ms)
+ GET /api/auth/session 200 in 31ms (next.js: 19ms, application-code: 12ms)
+ GET /logo.png 404 in 127ms (next.js: 38ms, application-code: 89ms)
+ GET /logo.png 404 in 128ms (next.js: 86ms, application-code: 42ms)
+ GET /api/auth/session 200 in 267ms (next.js: 164ms, application-code: 103ms)
+ GET /api/auth/session 200 in 53ms (next.js: 24ms, application-code: 29ms)
+ GET /api/auth/session 200 in 56ms (next.js: 16ms, application-code: 40ms)
+ GET /api/auth/session 200 in 62ms (next.js: 24ms, application-code: 38ms)
+ GET /api/auth/session 200 in 49ms (next.js: 16ms, application-code: 33ms)
+ GET /api/auth/session 200 in 65ms (next.js: 29ms, application-code: 36ms)
+ GET /login 200 in 1238ms (next.js: 388ms, application-code: 850ms)
+ GET /logo.png 404 in 137ms (next.js: 52ms, application-code: 85ms)
+ GET /logo.png 404 in 65ms (next.js: 11ms, application-code: 54ms)
+ GET /api/auth/session 200 in 78ms (next.js: 40ms, application-code: 38ms)
+ GET /login?callbackUrl=%2F 200 in 338ms (next.js: 97ms, application-code: 242ms)
+ GET /logo.png 404 in 103ms (next.js: 42ms, application-code: 61ms)
+ GET /logo.png 404 in 68ms (next.js: 12ms, application-code: 56ms)
+ GET /api/auth/session 200 in 106ms (next.js: 50ms, application-code: 56ms)

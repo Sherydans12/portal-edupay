@@ -1,11 +1,16 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { formatGuardianRut, verifyGuardianExists } from "@/lib/edupay";
+import {
+  formatGuardianRut,
+  getEdupayTenantId,
+  verifyGuardianExists,
+} from "@/lib/edupay";
 import prisma from "@/lib/prisma";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
+  const tenantId = getEdupayTenantId();
   const { rut, email, password } = await request.json();
   const rawRut = typeof rut === "string" ? rut.trim() : "";
   const cleanRut = rawRut ? formatGuardianRut(rawRut) : "";
@@ -36,8 +41,10 @@ export async function POST(request: Request) {
   }
 
   const tenant = await prisma.tenant.findFirst({
-    where: { isActive: true },
-    orderBy: { createdAt: "asc" },
+    where: {
+      id: tenantId,
+      isActive: true,
+    },
   });
 
   if (!tenant) {

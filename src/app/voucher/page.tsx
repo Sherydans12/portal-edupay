@@ -1,92 +1,150 @@
 import Link from "next/link";
-import prisma from "@/lib/prisma";
+import { ArrowLeft, CircleAlert, CircleCheckBig, ReceiptText } from "lucide-react";
+import { VoucherDownloadButton } from "@/app/voucher/VoucherDownloadButton";
 import { formatCurrency } from "@/lib/format";
+import prisma from "@/lib/prisma";
 
 type VoucherPageProps = {
   searchParams: Promise<{
-    token?: string | string[];
+    token_ws?: string | string[];
     status?: string | string[];
   }>;
 };
 
+const dateFormatter = new Intl.DateTimeFormat("es-CL", {
+  dateStyle: "long",
+  timeStyle: "short",
+  timeZone: "America/Santiago",
+});
+
 export default async function VoucherPage({ searchParams }: VoucherPageProps) {
   const params = await searchParams;
-  const token = Array.isArray(params.token) ? params.token[0] : params.token;
-  const transaction = token
+  const tokenWs = Array.isArray(params.token_ws)
+    ? params.token_ws[0]
+    : params.token_ws;
+  const transaction = tokenWs
     ? await prisma.transaction.findUnique({
-        where: { tokenWs: token },
-        select: {
-          amount: true,
-          buyOrder: true,
-          status: true,
-          authorizationCode: true,
-          createdAt: true,
-        },
+        where: { tokenWs },
       })
     : null;
 
-  const isSuccess = transaction?.status === "AUTHORIZED";
-  const title = isSuccess ? "Pago aprobado" : "Pago no completado";
-  const description = isSuccess
-    ? "Transbank autorizó la transacción y el pago quedó registrado."
-    : "La transacción fue rechazada, cancelada o no pudo confirmarse.";
+  if (!transaction) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 text-slate-900">
+        <section className="w-full max-w-lg rounded-[16px] border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-900/5">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+            <ReceiptText className="h-8 w-8" aria-hidden />
+          </div>
+          <h1 className="mt-5 text-2xl font-black text-slate-950">
+            Transacción no encontrada
+          </h1>
+          <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-600">
+            No pudimos encontrar un comprobante asociado a este enlace. Revisa
+            la dirección o vuelve al portal para consultar tus pagos.
+          </p>
+          <Link
+            href="/"
+            className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-tenant-primary px-4 text-sm font-bold text-white transition hover:bg-tenant-primary/90"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Volver al Inicio
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  const isAuthorized = transaction.status === "AUTHORIZED";
+  const paymentDate = transaction.updatedAt.toISOString();
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
-      <section className="mx-auto max-w-xl rounded-[8px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <div
-          className={`flex h-14 w-14 items-center justify-center rounded-[8px] text-2xl font-black ${
-            isSuccess
-              ? "bg-emerald-50 text-emerald-600"
-              : "bg-rose-50 text-rose-600"
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 text-slate-900">
+      <section className="w-full max-w-xl overflow-hidden rounded-[16px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
+        <header
+          className={`px-6 py-7 text-white sm:px-8 ${
+            isAuthorized ? "bg-emerald-700" : "bg-rose-700"
           }`}
         >
-          {isSuccess ? "✓" : "!"}
-        </div>
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/15">
+              {isAuthorized ? (
+                <CircleCheckBig className="h-8 w-8" aria-hidden />
+              ) : (
+                <CircleAlert className="h-8 w-8" aria-hidden />
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/75">
+                Comprobante Webpay Plus
+              </p>
+              <h1 className="mt-1 text-2xl font-black sm:text-3xl">
+                {isAuthorized ? "Pago aprobado" : "Pago no completado"}
+              </h1>
+            </div>
+          </div>
+        </header>
 
-        <h1 className="mt-5 text-3xl font-black text-tenant-primary">
-          {title}
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+        <div className="px-6 py-7 sm:px-8">
+          <p className="text-sm leading-6 text-slate-600">
+            {isAuthorized
+              ? "Transbank autorizó la operación. Conserva este comprobante como respaldo de tu pago."
+              : "La operación fue rechazada o no pudo completarse. No se registró un pago exitoso."}
+          </p>
 
-        {transaction ? (
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Metric label="Orden de compra" value={transaction.buyOrder} />
-            <Metric label="Monto" value={formatCurrency(transaction.amount)} />
-            <Metric label="Estado" value={transaction.status} />
-            <Metric
-              label="Código autorización"
+          <div className="mt-7 divide-y divide-dashed divide-slate-200 border-y border-dashed border-slate-300">
+            <ReceiptRow
+              label="Fecha"
+              value={dateFormatter.format(transaction.updatedAt)}
+            />
+            <ReceiptRow label="Medio de Pago" value="Webpay Plus" />
+            <ReceiptRow
+              label="Orden de Compra"
+              value={transaction.buyOrder}
+            />
+            <ReceiptRow
+              label="Código de Autorización"
               value={transaction.authorizationCode ?? "No disponible"}
             />
           </div>
-        ) : (
-          <div className="mt-6 rounded-[8px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            No encontramos una transacción asociada a este comprobante.
-          </div>
-        )}
 
-        {isSuccess && (
-          <Link
-            href="/"
-            className="mt-6 flex h-11 w-full items-center justify-center rounded-[8px] bg-tenant-primary px-4 text-sm font-bold text-white transition hover:bg-tenant-primary/90"
-          >
-            Volver al Dashboard
-          </Link>
-        )}
+          <div className="mt-6 flex items-end justify-between gap-4 rounded-[12px] bg-slate-100 p-5">
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+              Monto Total
+            </span>
+            <span className="text-2xl font-black text-slate-950 sm:text-3xl">
+              {formatCurrency(transaction.amount)}
+            </span>
+          </div>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-2">
+            <VoucherDownloadButton
+              amount={transaction.amount}
+              buyOrder={transaction.buyOrder}
+              authorizationCode={transaction.authorizationCode}
+              paymentDate={paymentDate}
+              isAuthorized={isAuthorized}
+            />
+            <Link
+              href="/"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-tenant-primary px-4 text-sm font-bold text-white transition hover:bg-tenant-primary/90"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Volver al Inicio
+            </Link>
+          </div>
+        </div>
       </section>
     </main>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function ReceiptRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[8px] border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 break-words text-base font-black text-slate-950">
+    <div className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <span className="text-sm font-medium text-slate-500">{label}</span>
+      <span className="break-all text-sm font-bold text-slate-950 sm:text-right">
         {value}
-      </p>
+      </span>
     </div>
   );
 }
