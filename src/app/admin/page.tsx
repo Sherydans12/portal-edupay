@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   BadgeCheck,
-  Building2,
   CircleDollarSign,
   DatabaseZap,
   LayoutDashboard,
@@ -10,8 +9,10 @@ import {
 import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { Prisma } from "@prisma/client";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
 import { SyncRetryButton } from "@/components/admin/SyncRetryButton";
+import { TenantSwitcher } from "@/components/tenant-switcher";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
@@ -30,7 +31,10 @@ const dateFormatter = new Intl.DateTimeFormat("es-CL", {
 });
 
 type AdminPageProps = {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string | string[];
+    tenant?: string | string[];
+  }>;
 };
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -40,12 +44,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect(session?.user?.role === "GUARDIAN" ? "/" : "/login");
   }
 
-  const requestedPage = Number((await searchParams).page ?? "1");
+  const params = await searchParams;
+  const selectedTenantId = getSingleSearchParam(params.tenant);
+  const requestedPage = Number(getSingleSearchParam(params.page) ?? "1");
   const page = Number.isInteger(requestedPage) && requestedPage > 0
     ? requestedPage
     : 1;
 
+  const transactionWhere: Prisma.TransactionWhereInput | undefined =
+    selectedTenantId ? { tenantId: selectedTenantId } : undefined;
+
   const [
+    tenants,
     collected,
     successfulTransactions,
     failedTransactions,
@@ -53,17 +63,35 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     totalTransactions,
     transactions,
   ] = await Promise.all([
+    prisma.tenant.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+      },
+      where: {
+        isActive: true,
+      },
+    }),
     prisma.transaction.aggregate({
-      where: { status: "AUTHORIZED" },
+      where: { ...transactionWhere, status: "AUTHORIZED" },
       _sum: { amount: true },
     }),
-    prisma.transaction.count({ where: { status: "AUTHORIZED" } }),
     prisma.transaction.count({
-      where: { status: { in: ["REJECTED", "FAILED"] } },
+      where: { ...transactionWhere, status: "AUTHORIZED" },
     }),
-    prisma.transaction.count({ where: { edupaySynced: false } }),
-    prisma.transaction.count(),
+    prisma.transaction.count({
+      where: {
+        ...transactionWhere,
+        status: { in: ["REJECTED", "FAILED"] },
+      },
+    }),
+    prisma.transaction.count({
+      where: { ...transactionWhere, edupaySynced: false },
+    }),
+    prisma.transaction.count({ where: transactionWhere }),
     prisma.transaction.findMany({
+      where: transactionWhere,
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -80,20 +108,32 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             rut: true,
           },
         },
+        tenant: {
+          select: {
+            name: true,
+          },
+        },
       },
     }),
   ]);
 
+  const selectedTenant = selectedTenantId
+    ? tenants.find((tenant) => tenant.id === selectedTenantId)
+    : null;
+  const selectedTenantLabel =
+    selectedTenant?.name ?? selectedTenantId ?? "Todos los Colegios";
+  const scopeLabel = selectedTenantId ? selectedTenantLabel : "Todos los Colegios";
+  const adminTitle = `Panel Global - ${scopeLabel}`;
   const totalPages = Math.max(1, Math.ceil(totalTransactions / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
 
   if (currentPage !== page) {
-    redirect(`/admin?page=${currentPage}`);
+    redirect(createAdminHref(currentPage, selectedTenantId));
   }
 
   const metrics = [
     {
-      label: "Total recaudado (global)",
+      label: selectedTenantId ? "Total recaudado" : "Total recaudado global",
       value: moneyFormatter.format(collected._sum.amount ?? 0),
       icon: CircleDollarSign,
       tone: "text-emerald-700 bg-emerald-50 border-emerald-100",
@@ -156,13 +196,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Operaciones
             </p>
             <h1 className="mt-1 text-2xl font-black tracking-tight">
-              Dashboard global
+              {adminTitle}
             </h1>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
-            <Building2 className="h-4 w-4 text-blue-600" aria-hidden />
-            Todos los tenants
-          </div>
+          <TenantSwitcher
+            activeTenantId={selectedTenantId}
+            tenants={tenants}
+          />
         </div>
       </header>
 
@@ -200,10 +240,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-black">Transacciones globales</h2>
+                <h2 className="font-black">
+                  {selectedTenantId
+                    ? `Transacciones de ${selectedTenantLabel}`
+                    : "Transacciones globales"}
+                </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {totalTransactions.toLocaleString("es-CL")} registros en todos
-                  los colegios.
+                  {totalTransactions.toLocaleString("es-CL")} registros{" "}
+                  {selectedTenantId
+                    ? `para tenantId ${selectedTenantId}.`
+                    : "en todos los colegios."}
                 </p>
               </div>
               <p className="text-sm font-semibold text-slate-500">
@@ -216,7 +262,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-5 py-3 font-bold">ID transacción</th>
-                    <th className="px-5 py-3 font-bold">Tenant ID</th>
+                    <th className="px-5 py-3 font-bold">
+                      Colegio / Tenant ID
+                    </th>
                     <th className="px-5 py-3 font-bold">Apoderado</th>
                     <th className="px-5 py-3 font-bold">Monto</th>
                     <th className="px-5 py-3 font-bold">Fecha</th>
@@ -240,7 +288,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         </p>
                       </td>
                       <td className="px-5 py-4 font-mono text-xs text-slate-600">
-                        {transaction.tenantId}
+                        <p className="font-sans text-sm font-bold text-slate-800">
+                          {transaction.tenant.name}
+                        </p>
+                        <p className="mt-1 font-mono text-[11px] text-slate-500">
+                          {transaction.tenantId}
+                        </p>
                       </td>
                       <td className="px-5 py-4 font-semibold text-slate-700">
                         {transaction.guardian.rut}
@@ -295,11 +348,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 page={currentPage - 1}
                 disabled={currentPage <= 1}
                 label="Anterior"
+                tenantId={selectedTenantId}
               />
               <PaginationLink
                 page={currentPage + 1}
                 disabled={currentPage >= totalPages}
                 label="Siguiente"
+                tenantId={selectedTenantId}
               />
             </div>
           </section>
@@ -307,6 +362,28 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </main>
     </div>
   );
+}
+
+function getSingleSearchParam(value?: string | string[]) {
+  const resolvedValue = Array.isArray(value) ? value[0] : value;
+  const trimmedValue = resolvedValue?.trim();
+
+  return trimmedValue || undefined;
+}
+
+function createAdminHref(page: number, tenantId?: string | null) {
+  const params = new URLSearchParams();
+
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+
+  if (tenantId) {
+    params.set("tenant", tenantId);
+  }
+
+  const queryString = params.toString();
+  return queryString ? `/admin?${queryString}` : "/admin";
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -332,10 +409,12 @@ function PaginationLink({
   disabled,
   label,
   page,
+  tenantId,
 }: {
   disabled: boolean;
   label: string;
   page: number;
+  tenantId?: string | null;
 }) {
   if (disabled) {
     return (
@@ -347,7 +426,7 @@ function PaginationLink({
 
   return (
     <Link
-      href={`/admin?page=${page}`}
+      href={createAdminHref(page, tenantId)}
       className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
     >
       {label}
