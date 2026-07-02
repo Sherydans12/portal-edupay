@@ -21,6 +21,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
 RUN npm run build
+RUN npx tsc scripts/clean-prod.ts --module CommonJS --moduleResolution node --target ES2020 --outDir dist-scripts --esModuleInterop --skipLibCheck --noEmit false
 
 # Production image, copy the standalone server and runtime dependencies
 FROM base AS runner
@@ -34,6 +35,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=nextjs:nodejs /app/dist-scripts ./dist-scripts
 COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Ensure the generated Prisma client and engine binaries survive standalone tracing.

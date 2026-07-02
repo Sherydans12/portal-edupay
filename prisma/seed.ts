@@ -2,9 +2,15 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
-const tenantId = process.env.NEXT_PUBLIC_TENANT_ID ?? "colegio-pruebas";
+const isProduction = process.env.NODE_ENV === "production";
+const configuredTenantId = process.env.NEXT_PUBLIC_TENANT_ID;
+const tenantId = configuredTenantId ?? "colegio-pruebas";
 
 async function main() {
+  if (isProduction && !configuredTenantId) {
+    throw new Error("NEXT_PUBLIC_TENANT_ID debe estar definido en production.");
+  }
+
   // ── 1. Usuario administrador ───────────────────────────────────
   const adminPassword = await bcrypt.hash("base2026", 10);
   const admin = await prisma.adminUser.upsert({
@@ -46,6 +52,11 @@ async function main() {
   });
 
   console.log(`✅ Tenant: ${tenant.name} (${tenant.id})`);
+
+  if (isProduction) {
+    console.log("✅ Seed production: datos de prueba omitidos");
+    return;
+  }
 
   // ── 3. Apoderados ──────────────────────────────────────────────
   const hash1 = await bcrypt.hash("demo123", 10);
