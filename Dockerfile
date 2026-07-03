@@ -21,7 +21,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
 RUN npm run build
-RUN npx tsc scripts/clean-prod.ts --module CommonJS --moduleResolution node --target ES2020 --outDir dist-scripts --esModuleInterop --skipLibCheck --noEmit false
+RUN npx tsc scripts/clean-prod.ts scripts/seed-demo.ts --module CommonJS --moduleResolution node --target ES2020 --outDir dist-scripts --esModuleInterop --skipLibCheck --noEmit false
 
 # Production image, copy the standalone server and runtime dependencies
 FROM base AS runner
