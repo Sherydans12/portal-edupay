@@ -9,7 +9,6 @@ import {
 import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { Prisma } from "@prisma/client";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
 import { SyncRetryButton } from "@/components/admin/SyncRetryButton";
 import { TenantSwitcher } from "@/components/tenant-switcher";
@@ -51,8 +50,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     ? requestedPage
     : 1;
 
-  const transactionWhere: Prisma.TransactionWhereInput | undefined =
-    selectedTenantId ? { tenantId: selectedTenantId } : undefined;
+  const transactionWhere = selectedTenantId
+    ? { tenantId: selectedTenantId }
+    : undefined;
 
   const [
     tenants,
