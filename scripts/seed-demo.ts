@@ -59,7 +59,7 @@ async function main() {
     where: {
       tenantId_rut: {
         tenantId: tenant.id,
-        rut: "12.345.678-9",
+        rut: "12.345.678-5",
       },
     },
     update: {
@@ -68,7 +68,7 @@ async function main() {
     },
     create: {
       tenantId: tenant.id,
-      rut: "12.345.678-9",
+      rut: "12.345.678-5",
       email: "marcela.fuentes@example.com",
       passwordHash: guardianPassword,
     },
