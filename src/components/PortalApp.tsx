@@ -16,15 +16,24 @@ import type { Guardian, Installment } from "@/types/payments";
 import type { ActiveSection } from "@/types/portal";
 
 type PortalAppProps = {
-  statement: EdupayStatementResponse;
+  statement: EdupayStatementResponse | null;
+  guardianRut: string;
 };
 
-export function PortalApp({ statement }: PortalAppProps) {
-  const guardian: Guardian = {
-    ...statement.guardian,
-    students: statement.students,
-  };
-  const { status } = useSession();
+export function PortalApp({ statement, guardianRut }: PortalAppProps) {
+  const { data: session, status } = useSession();
+  const guardian: Guardian = statement
+    ? {
+        ...statement.guardian,
+        students: statement.students,
+      }
+    : {
+        id: guardianRut,
+        name: session?.user?.name ?? "Apoderado",
+        rut: guardianRut,
+        email: session?.user?.email ?? "",
+        students: [],
+      };
   const [activeSection, setActiveSection] = useState<ActiveSection>("account");
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     guardian.students[0]?.id ?? "",
@@ -127,6 +136,39 @@ export function PortalApp({ statement }: PortalAppProps) {
 
   if (status === "loading") {
     return <PortalSkeleton />;
+  }
+
+  if (!statement) {
+    return (
+      <DashboardLayout
+        guardian={guardian}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        onLogout={handleLogout}
+      >
+        <section className="mx-auto max-w-6xl" aria-live="polite">
+          <div className="rounded-[8px] border border-amber-200 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-amber-700">
+              Servicio temporalmente no disponible
+            </p>
+            <h1 className="mt-3 text-2xl font-black text-tenant-primary">
+              No se pudieron cargar los datos académicos en este momento
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+              Tu sesión sigue activa. Intenta nuevamente en unos minutos; no es
+              necesario volver a iniciar sesión.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-6 h-11 rounded-[8px] bg-tenant-primary px-5 text-sm font-bold text-white transition hover:bg-tenant-primary/90"
+            >
+              Reintentar
+            </button>
+          </div>
+        </section>
+      </DashboardLayout>
+    );
   }
 
   return (
