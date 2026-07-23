@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { getEdupayTenantId, syncPaymentWithEduPay } from "@/lib/edupay";
 import { sendPaymentReceiptEmail } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
   try {
     formData = await request.formData();
   } catch {
-    return redirectToVoucher(request, "timeout");
+    return redirectToVoucher(getPublicAppUrl(request), "timeout");
   }
 
   return handleCallback(request, {
@@ -46,14 +47,16 @@ async function handleCallback(
   request: NextRequest,
   params: WebpayCallbackParams,
 ) {
+  const publicAppUrl = getPublicAppUrl(request);
+
   if (!params.tokenWs) {
     const status = params.tbkToken ? "cancelled" : "timeout";
-    return redirectToVoucher(request, status);
+    return redirectToVoucher(publicAppUrl, status);
   }
 
   const tokenWs = params.tokenWs;
   const tenantId = getEdupayTenantId();
-  const voucherUrl = new URL("/voucher", request.nextUrl.origin);
+  const voucherUrl = new URL("/voucher", publicAppUrl);
   voucherUrl.searchParams.set("token_ws", tokenWs);
 
   let localTransaction = await prisma.transaction.findFirst({
@@ -226,8 +229,8 @@ function formValue(formData: FormData, key: string) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function redirectToVoucher(request: NextRequest, status: string) {
-  const voucherUrl = new URL("/voucher", request.nextUrl.origin);
+function redirectToVoucher(publicAppUrl: string, status: string) {
+  const voucherUrl = new URL("/voucher", publicAppUrl);
   voucherUrl.searchParams.set("status", status);
   return NextResponse.redirect(voucherUrl, 303);
 }

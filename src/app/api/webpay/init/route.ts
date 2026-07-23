@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { getEdupayTenantId } from "@/lib/edupay";
 import prisma from "@/lib/prisma";
 import {
@@ -94,8 +95,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Apoderado no encontrado" }, { status: 404 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const returnUrl = `${appUrl.replace(/\/$/, "")}/api/webpay/return`;
+  const returnUrl = new URL(
+    "/api/webpay/return",
+    getPublicAppUrl(request),
+  ).toString();
   const buyOrder = `OC-${Date.now()}`;
   const transbankResponse = await webpayTransaction.create(
     buyOrder,
