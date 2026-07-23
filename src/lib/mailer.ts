@@ -1,5 +1,10 @@
 import { Resend } from "resend";
-import type { Transaction } from "@prisma/client";
+import {
+  EmailStatus,
+  EmailType,
+  type Transaction,
+} from "@prisma/client";
+import prisma from "@/lib/prisma";
 
 const DEFAULT_APP_URL = "http://localhost:3000";
 const DEFAULT_EMAIL_FROM =
@@ -19,25 +24,100 @@ const formatDate = (date: Date) =>
     timeZone: "America/Santiago",
   }).format(date);
 
-export async function sendPasswordResetEmail(email: string, token: string) {
+type SendEmailInput = {
+  tenantId: string;
+  to: string;
+  subject: string;
+  type: EmailType;
+  html: string;
+  simulationMessage: string;
+  failureMessage: string;
+};
+
+async function sendEmail(input: SendEmailInput) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+
+  if (!apiKey) {
+    console.warn(`[EMAIL CONSOLE MODE] ${input.simulationMessage}`);
+    await createEmailLog(input, EmailStatus.SIMULATED);
+
+    return { ok: true, status: EmailStatus.SIMULATED };
+  }
+
+  const resend = new Resend(apiKey);
+  let sendError: Error | null = null;
+
+  try {
+    const result = await resend.emails.send({
+      from: getEmailFrom(),
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+    });
+
+    if (result.error) {
+      sendError = new Error(result.error.message);
+    }
+  } catch (error) {
+    sendError = normalizeError(error);
+  }
+
+  if (sendError) {
+    const failure = new Error(`${input.failureMessage}: ${sendError.message}`);
+    await createEmailLog(input, EmailStatus.FAILED, failure.message);
+    throw failure;
+  }
+
+  await createEmailLog(input, EmailStatus.SENT);
+  return { ok: true, status: EmailStatus.SENT };
+}
+
+function createEmailLog(
+  input: SendEmailInput,
+  status: EmailStatus,
+  error?: string,
+) {
+  return prisma.emailLog.create({
+    data: {
+      tenantId: input.tenantId,
+      to: input.to,
+      subject: input.subject,
+      type: input.type,
+      status,
+      error,
+    },
+  });
+}
+
+function getEmailFrom() {
+  return (
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    process.env.EMAIL_FROM?.trim() ||
+    DEFAULT_EMAIL_FROM
+  );
+}
+
+function normalizeError(error: unknown) {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+export async function sendPasswordResetEmail(
+  tenantId: string,
+  email: string,
+  token: string,
+) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? DEFAULT_APP_URL;
   const resetUrl = new URL("/reset-password", appUrl);
   resetUrl.searchParams.set("token", token);
+  const subject = "Restablece tu contraseña";
 
-  if (!process.env.RESEND_API_KEY) {
-    console.warn(
-      `[EMAIL CONSOLE MODE] Simulando envío de recuperación a ${email}. URL mágica: ${resetUrl.toString()}`,
-    );
-
-    return { ok: true };
-  }
-
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
-  const { error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM ?? DEFAULT_EMAIL_FROM,
+  return sendEmail({
+    tenantId,
     to: email,
-    subject: "Restablece tu contraseña",
+    subject,
+    type: EmailType.FORGOT_PASSWORD,
+    simulationMessage: `Simulando envío de recuperación a ${email}. URL mágica: ${resetUrl.toString()}`,
+    failureMessage: "No fue posible enviar el correo de recuperación",
     html: `
       <div style="font-family: Arial, sans-serif; color: #1e293b; line-height: 1.6; max-width: 560px; margin: 0 auto; padding: 24px;">
         <h1 style="color: #0f172a; font-size: 24px; margin-bottom: 16px;">Restablece tu contraseña</h1>
@@ -54,12 +134,6 @@ export async function sendPasswordResetEmail(email: string, token: string) {
       </div>
     `,
   });
-
-  if (error) {
-    throw new Error(`No fue posible enviar el correo de recuperación: ${error.message}`);
-  }
-
-  return { ok: true };
 }
 
 export async function sendPaymentReceiptEmail(
@@ -69,20 +143,15 @@ export async function sendPaymentReceiptEmail(
   const authorizationCode = tx.authorizationCode ?? "No disponible";
   const amount = formatCurrency(tx.amount);
   const paymentDate = formatDate(tx.updatedAt);
+  const subject = `Pago aprobado - ${tx.buyOrder}`;
 
-  if (!process.env.RESEND_API_KEY) {
-    console.warn(
-      `[EMAIL CONSOLE MODE] Comprobante de pago para ${email}: ${tx.buyOrder}, ${amount}, autorización ${authorizationCode}, fecha ${paymentDate}`,
-    );
-
-    return { ok: true };
-  }
-
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const { error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM ?? DEFAULT_EMAIL_FROM,
+  return sendEmail({
+    tenantId: tx.tenantId,
     to: email,
-    subject: `Pago aprobado - ${tx.buyOrder}`,
+    subject,
+    type: EmailType.PAYMENT_RECEIPT,
+    simulationMessage: `Comprobante de pago para ${email}: ${tx.buyOrder}, ${amount}, autorización ${authorizationCode}, fecha ${paymentDate}`,
+    failureMessage: "No fue posible enviar el comprobante de pago",
     html: `
       <div style="margin: 0; padding: 32px 16px; background: #f1f5f9; font-family: Arial, sans-serif; color: #1e293b;">
         <div style="max-width: 600px; margin: 0 auto; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 16px; background: #ffffff; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);">
@@ -121,12 +190,4 @@ export async function sendPaymentReceiptEmail(
       </div>
     `,
   });
-
-  if (error) {
-    throw new Error(
-      `No fue posible enviar el comprobante de pago: ${error.message}`,
-    );
-  }
-
-  return { ok: true };
 }

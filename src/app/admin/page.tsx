@@ -6,13 +6,12 @@ import {
   DatabaseZap,
   Download,
   Filter,
-  LayoutDashboard,
-  ShieldCheck,
+  Mail,
 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SyncRetryButton } from "@/components/admin/SyncRetryButton";
 import { TenantSwitcher } from "@/components/tenant-switcher";
 import { authOptions } from "@/lib/auth";
@@ -182,34 +181,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-800 bg-slate-950 px-5 py-6 text-white lg:flex">
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-600">
-            <ShieldCheck className="h-5 w-5" aria-hidden />
-          </span>
-          <div>
-            <p className="font-black tracking-tight">BaseLogic Ops</p>
-            <p className="text-xs text-slate-400">Consola multi-tenant</p>
-          </div>
-        </div>
-
-        <nav className="mt-10">
-          <span className="flex items-center gap-3 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-bold text-white">
-            <LayoutDashboard className="h-4 w-4" aria-hidden />
-            Dashboard global
-          </span>
-        </nav>
-
-        <div className="mt-auto border-t border-slate-800 pt-5">
-          <p className="px-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Super Admin
-          </p>
-          <p className="mb-4 mt-2 truncate px-3 text-sm text-slate-300">
-            {session.user.email}
-          </p>
-          <AdminSignOutButton />
-        </div>
-      </aside>
+      <AdminSidebar
+        activeSection="dashboard"
+        adminEmail={session.user.email}
+      />
 
       <header className="border-b border-slate-200 bg-white px-4 py-4 lg:ml-64 lg:px-8">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
@@ -221,12 +196,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {adminTitle}
             </h1>
           </div>
-          <TenantSwitcher
-            activeTenantId={selectedTenantId}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            tenants={tenants}
-          />
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/emails"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 lg:hidden"
+            >
+              <Mail className="h-4 w-4" aria-hidden />
+              Correos
+            </Link>
+            <TenantSwitcher
+              activeTenantId={selectedTenantId}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              tenants={tenants}
+            />
+          </div>
         </div>
       </header>
 

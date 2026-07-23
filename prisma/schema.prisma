@@ -18,6 +18,7 @@ model Tenant {
 
   guardians    GuardianUser[]
   transactions Transaction[]
+  emailLogs    EmailLog[]
 }
 
 model GuardianUser {
@@ -69,4 +70,35 @@ model Transaction {
 
   tenant   Tenant       @relation(fields: [tenantId], references: [id])
   guardian GuardianUser @relation(fields: [guardianId], references: [id])
+}
+
+enum EmailType {
+  PAYMENT_RECEIPT
+  FORGOT_PASSWORD
+  WELCOME
+  SYSTEM
+}
+
+enum EmailStatus {
+  SENT
+  FAILED
+  SIMULATED
+}
+
+model EmailLog {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String
+  to        String
+  subject   String
+  type      EmailType
+  status    EmailStatus
+  error     String?
+  createdAt DateTime    @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
+  @@index([status, createdAt])
+  @@index([type, createdAt])
 }

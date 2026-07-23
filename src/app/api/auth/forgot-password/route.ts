@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       },
     });
 
-    await sendPasswordResetEmail(guardian.email, token);
+    await sendPasswordResetEmail(guardian.tenantId, guardian.email, token);
   }
 
   return NextResponse.json({
