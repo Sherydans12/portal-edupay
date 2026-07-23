@@ -33,6 +33,14 @@ export interface EdupayPaymentSyncResponse {
   synced: boolean;
 }
 
+export type EdupayPaymentSyncInput = {
+  buyOrder: string | number;
+  amount: string | number;
+  authorizationCode?: string | number | null;
+  cardNumber?: string | number | null;
+  chargeIds: Array<string | number>;
+};
+
 type GuardianExistsResponse = {
   exists: boolean;
 };
@@ -184,12 +192,11 @@ export function getGuardianStatement(
 }
 
 export function syncPaymentWithEduPay(
-  buyOrder: string,
-  amount: number,
-  paymentDate: string,
-  installmentsIds: number[],
+  input: EdupayPaymentSyncInput,
   tenantId?: string,
 ): Promise<EdupayPaymentSyncResponse> {
+  const payload = createEdupayPaymentSyncPayload(input);
+
   return edupayFetch<EdupayPaymentSyncResponse>(
     "/api/v1/portal/payments/sync",
     {
@@ -197,15 +204,39 @@ export function syncPaymentWithEduPay(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        buyOrder,
-        amount,
-        paymentDate,
-        installmentsIds,
-      }),
+      body: JSON.stringify(payload),
     },
     tenantId,
   );
+}
+
+export function createEdupayPaymentSyncPayload(
+  input: EdupayPaymentSyncInput,
+) {
+  const amount = Number(input.amount);
+  const chargeIds = input.chargeIds.map((id) => Number(id));
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("El monto para sincronizar con EduPay no es válido");
+  }
+
+  if (
+    chargeIds.length === 0 ||
+    !chargeIds.every(
+      (id) => typeof id === "number" && Number.isInteger(id),
+    )
+  ) {
+    throw new Error("chargeIds debe contener únicamente números enteros");
+  }
+
+  return {
+    buyOrder: String(input.buyOrder),
+    amount,
+    paymentMethod: "WEBPAY" as const,
+    authorizationCode: String(input.authorizationCode || "0000"),
+    cardNumber: String(input.cardNumber || "0000").slice(-4),
+    chargeIds,
+  };
 }
 
 function formatInstallmentMonth(month: string) {

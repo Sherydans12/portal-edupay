@@ -67,7 +67,8 @@ function findPendingTransactions(buyOrder?: string) {
     select: {
       buyOrder: true,
       amount: true,
-      updatedAt: true,
+      authorizationCode: true,
+      cardLastFour: true,
       edupayPayload: true,
       tenantId: true,
     },
@@ -83,12 +84,15 @@ async function retryTransactions(
 
   for (const transaction of transactions) {
     try {
-      const installmentsIds = parseInstallmentIds(transaction.edupayPayload);
+      const chargeIds = parseChargeIds(transaction.edupayPayload);
       const syncResponse = await syncPaymentWithEduPay(
-        transaction.buyOrder,
-        transaction.amount,
-        transaction.updatedAt.toISOString(),
-        installmentsIds,
+        {
+          buyOrder: transaction.buyOrder,
+          amount: transaction.amount,
+          authorizationCode: transaction.authorizationCode,
+          cardNumber: transaction.cardLastFour,
+          chargeIds,
+        },
         transaction.tenantId,
       );
 
@@ -131,19 +135,21 @@ async function retryTransactions(
   };
 }
 
-function parseInstallmentIds(payload: unknown): number[] {
+function parseChargeIds(payload: unknown): number[] {
   if (!Array.isArray(payload)) {
     throw new Error("El payload de EduPay no es un array");
   }
 
-  const installmentsIds = payload.map(Number);
+  const chargeIds = payload.map((id) => Number(id));
 
   if (
-    installmentsIds.length === 0 ||
-    !installmentsIds.every((id) => Number.isInteger(id))
+    chargeIds.length === 0 ||
+    !chargeIds.every(
+      (id) => typeof id === "number" && Number.isInteger(id),
+    )
   ) {
-    throw new Error("El payload de EduPay contiene IDs de cuotas inválidos");
+    throw new Error("El payload de EduPay contiene chargeIds inválidos");
   }
 
-  return installmentsIds;
+  return chargeIds;
 }

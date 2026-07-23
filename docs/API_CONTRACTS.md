@@ -63,20 +63,12 @@ Request:
 
 ```json
 {
-  "portalPaymentId": "pay_01JZ0000000000000000000000",
-  "studentId": "stu_001",
-  "installmentIds": ["ins_001", "ins_002"],
+  "buyOrder": "OC-12345678",
   "amount": 190000,
-  "currency": "CLP",
-  "paidAt": "2026-06-23T15:30:00.000Z",
-  "provider": "WEBPAY_PLUS",
-  "webpay": {
-    "buyOrder": "OC-12345678",
-    "sessionId": "sess_abc123",
-    "authorizationCode": "AUTH-123456",
-    "transactionDate": "2026-06-23T15:30:00.000Z",
-    "responseCode": 0
-  }
+  "paymentMethod": "WEBPAY",
+  "authorizationCode": "AUTH-123456",
+  "cardNumber": "6623",
+  "chargeIds": [101, 102]
 }
 ```
 

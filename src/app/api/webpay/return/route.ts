@@ -169,15 +169,18 @@ async function handleCallback(
   const updatedTransaction = result.transaction;
 
   if (updatedTransaction && result.becameAuthorized) {
-    const installmentsIds = parseInstallmentIds(updatedTransaction.edupayPayload);
+    const chargeIds = parseChargeIds(updatedTransaction.edupayPayload);
 
-    if (installmentsIds.length > 0) {
+    if (chargeIds.length > 0) {
       try {
         const syncResponse = await syncPaymentWithEduPay(
-          updatedTransaction.buyOrder,
-          updatedTransaction.amount,
-          (updatedTransaction.transactionDate ?? updatedTransaction.updatedAt).toISOString(),
-          installmentsIds,
+          {
+            buyOrder: updatedTransaction.buyOrder,
+            amount: updatedTransaction.amount,
+            authorizationCode: response.authorization_code,
+            cardNumber: response.card_detail?.card_number,
+            chargeIds,
+          },
           tenantId,
         );
 
@@ -264,11 +267,16 @@ function parseTransactionDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function parseInstallmentIds(payload: unknown) {
+function parseChargeIds(payload: unknown) {
   if (!Array.isArray(payload)) {
     return [];
   }
 
-  const ids = payload.map(Number);
-  return ids.length > 0 && ids.every(Number.isInteger) ? ids : [];
+  const chargeIds = payload.map((id) => Number(id));
+  return chargeIds.length > 0 &&
+    chargeIds.every(
+      (id) => typeof id === "number" && Number.isInteger(id),
+    )
+    ? chargeIds
+    : [];
 }
