@@ -32,7 +32,11 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     setIsSubmitting(false);
 
     if (res?.error) {
-      toast.error("Credenciales incorrectas");
+      toast.error(
+        res.error === "RateLimit" || res.status === 429
+          ? "Demasiados intentos. Espera unos minutos antes de volver a intentar."
+          : "Credenciales incorrectas",
+      );
       return;
     }
 

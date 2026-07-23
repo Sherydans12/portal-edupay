@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { PortalApp } from "@/components/PortalApp";
+import { AccountStatementSkeleton } from "@/components/dashboard/AccountStatementSkeleton";
 import { authOptions } from "@/lib/auth";
 import {
   getGuardianStatement,
@@ -18,10 +20,18 @@ export default async function Home() {
     redirect("/login");
   }
 
+  return (
+    <Suspense fallback={<AccountStatementSkeleton />}>
+      <AccountStatementContent guardianRut={session.user.rut} />
+    </Suspense>
+  );
+}
+
+async function AccountStatementContent({ guardianRut }: { guardianRut: string }) {
   let statement: EdupayStatementResponse | null = null;
 
   try {
-    statement = await getGuardianStatement(session.user.rut);
+    statement = await getGuardianStatement(guardianRut);
   } catch (error) {
     console.error(
       "No se pudo cargar el estado de cuenta desde EduPay:",
@@ -29,5 +39,5 @@ export default async function Home() {
     );
   }
 
-  return <PortalApp statement={statement} guardianRut={session.user.rut} />;
+  return <PortalApp statement={statement} guardianRut={guardianRut} />;
 }

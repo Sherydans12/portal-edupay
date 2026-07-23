@@ -11,8 +11,13 @@ import {
 import { CertificatesManager } from "@/components/dashboard/CertificatesManager";
 import { PaymentHistory } from "@/components/dashboard/PaymentHistory";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { WebpayRedirectForm } from "@/components/payments/WebpayRedirectForm";
 import type { EdupayStatementResponse } from "@/lib/edupay";
-import type { Guardian, Installment } from "@/types/payments";
+import type {
+  Guardian,
+  Installment,
+  PaymentReceiptItem,
+} from "@/types/payments";
 import type { ActiveSection } from "@/types/portal";
 
 type PortalAppProps = {
@@ -40,6 +45,10 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   );
   const [selectedCuotas, setSelectedCuotas] = useState<number[]>([]);
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
+  const [webpayRedirect, setWebpayRedirect] = useState<{
+    url: string;
+    tokenWs: string;
+  } | null>(null);
 
   const selectedStudent =
     guardian.students.find((student) => student.id === selectedStudentId) ??
@@ -71,13 +80,27 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
       return;
     }
 
-    const selectedInstallments = guardian.students
-      .flatMap((student) => student.installments)
-      .filter(
-        (installment) =>
-          installment.status !== "PAGADO" &&
-          selectedCuotas.includes(installment.id),
-      );
+    const selectedEntries = guardian.students.flatMap((student) =>
+      student.installments
+        .filter(
+          (installment) =>
+            installment.status !== "PAGADO" &&
+            selectedCuotas.includes(installment.id),
+        )
+        .map((installment) => ({ student, installment })),
+    );
+    const selectedInstallments = selectedEntries.map(
+      ({ installment }) => installment,
+    );
+    const receiptItems: PaymentReceiptItem[] = selectedEntries.map(
+      ({ student, installment }) => ({
+        installmentId: installment.id,
+        studentName: student.name,
+        concept: "Mensualidad escolar",
+        month: installment.month,
+        amount: installment.amount,
+      }),
+    );
     const selectedTotal = getDebt(selectedInstallments);
 
     if (selectedTotal === 0) {
@@ -96,34 +119,39 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
           amount: selectedTotal,
           sessionId: `portal-multi-${Date.now()}`,
           edupayPayload: selectedInstallments.map((installment) => installment.id),
+          receiptItems,
         }),
       });
 
       if (!response.ok) {
-        throw new Error("No se pudo iniciar el pago");
+        const errorPayload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        throw new Error(
+          errorPayload?.error ?? "No se pudo iniciar el pago con Webpay.",
+        );
       }
 
       const payload = (await response.json()) as {
         url: string;
-        token: string;
+        token_ws?: string;
+        token?: string;
       };
+      const tokenWs = payload.token_ws ?? payload.token;
 
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = payload.url;
-      form.style.display = "none";
+      if (!payload.url || !tokenWs) {
+        throw new Error("Respuesta incompleta al iniciar Webpay");
+      }
 
-      const tokenInput = document.createElement("input");
-      tokenInput.type = "hidden";
-      tokenInput.name = "token_ws";
-      tokenInput.value = payload.token;
-      form.appendChild(tokenInput);
-
-      document.body.appendChild(form);
-      form.submit();
-    } catch {
+      setWebpayRedirect({ url: payload.url, tokenWs });
+    } catch (error) {
       setIsCreatingTransaction(false);
-      toast.error("No se pudo iniciar el pago con Webpay. Intenta nuevamente.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo iniciar el pago con Webpay. Intenta nuevamente.",
+      );
     }
   }
 
@@ -172,13 +200,20 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   }
 
   return (
-    <DashboardLayout
-      guardian={guardian}
-      activeSection={activeSection}
-      onSectionChange={setActiveSection}
-      onLogout={handleLogout}
-    >
-      <section className="mx-auto max-w-6xl">
+    <>
+      {isCreatingTransaction && (
+        <WebpayRedirectForm
+          url={webpayRedirect?.url}
+          tokenWs={webpayRedirect?.tokenWs}
+        />
+      )}
+      <DashboardLayout
+        guardian={guardian}
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        onLogout={handleLogout}
+      >
+        <section className="mx-auto max-w-6xl">
         {activeSection === "account" && (
           <AccountStatement
             statement={statement}
@@ -206,14 +241,21 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
             guardianRut={guardian.rut}
           />
         )}
-      </section>
-    </DashboardLayout>
+        </section>
+      </DashboardLayout>
+    </>
   );
 }
 
-function PortalSkeleton() {
+export function PortalSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div
+      className="min-h-screen bg-slate-50 text-slate-900"
+      role="status"
+      aria-busy="true"
+      aria-label="Cargando estado de cuenta"
+    >
+      <span className="sr-only">Cargando estado de cuenta</span>
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white px-6 py-6 lg:block">
         <div className="h-12 w-44 animate-pulse rounded-md bg-tenant-primary/15" />
         <div className="mt-10 space-y-3">

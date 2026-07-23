@@ -48,19 +48,24 @@ model AdminUser {
 }
 
 model Transaction {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId          String
-  guardianId        String   @db.Uuid
-  buyOrder          String   @unique
-  sessionId         String?
-  tokenWs           String?  @unique
-  amount            Int
-  status            String   @default("PENDING") // PENDING, AUTHORIZED, REJECTED, FAILED
-  authorizationCode String?
-  edupayPayload     Json? // IDs de las cuotas/deudas pagadas en EduPay
-  edupaySynced      Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String
+  guardianId         String    @db.Uuid
+  buyOrder           String    @unique
+  sessionId          String?
+  tokenWs            String?   @unique
+  amount             Int
+  status             String    @default("PENDING") // PENDING, AUTHORIZED, REJECTED, FAILED
+  authorizationCode  String?
+  cardLastFour       String?
+  paymentTypeCode    String?
+  installmentsNumber Int?
+  transactionDate    DateTime?
+  edupayPayload      Json? // IDs de las cuotas/deudas pagadas en EduPay
+  receiptItems       Json? // Snapshot legible de las cuotas para el comprobante
+  edupaySynced       Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   tenant   Tenant       @relation(fields: [tenantId], references: [id])
   guardian GuardianUser @relation(fields: [guardianId], references: [id])

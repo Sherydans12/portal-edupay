@@ -1,8 +1,11 @@
 import {
   AlertTriangle,
   BadgeCheck,
+  CalendarDays,
   CircleDollarSign,
   DatabaseZap,
+  Download,
+  Filter,
   LayoutDashboard,
   ShieldCheck,
 } from "lucide-react";
@@ -14,6 +17,10 @@ import { SyncRetryButton } from "@/components/admin/SyncRetryButton";
 import { TenantSwitcher } from "@/components/tenant-switcher";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  createTransactionWhere,
+  normalizeReportDate,
+} from "@/lib/transaction-report";
 
 const PAGE_SIZE = 50;
 
@@ -33,6 +40,8 @@ type AdminPageProps = {
   searchParams: Promise<{
     page?: string | string[];
     tenant?: string | string[];
+    from?: string | string[];
+    to?: string | string[];
   }>;
 };
 
@@ -45,14 +54,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const params = await searchParams;
   const selectedTenantId = getSingleSearchParam(params.tenant);
+  const dateFrom = normalizeReportDate(params.from);
+  const dateTo = normalizeReportDate(params.to);
+  const hasInvalidDateRange = Boolean(
+    dateFrom && dateTo && dateFrom > dateTo,
+  );
   const requestedPage = Number(getSingleSearchParam(params.page) ?? "1");
   const page = Number.isInteger(requestedPage) && requestedPage > 0
     ? requestedPage
     : 1;
 
-  const transactionWhere = selectedTenantId
-    ? { tenantId: selectedTenantId }
-    : undefined;
+  const transactionWhere = createTransactionWhere({
+    tenantId: selectedTenantId,
+    dateFrom,
+    dateTo,
+  });
 
   const [
     tenants,
@@ -87,7 +103,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       },
     }),
     prisma.transaction.count({
-      where: { ...transactionWhere, edupaySynced: false },
+      where: {
+        ...transactionWhere,
+        status: "AUTHORIZED",
+        edupaySynced: false,
+      },
     }),
     prisma.transaction.count({ where: transactionWhere }),
     prisma.transaction.findMany({
@@ -128,7 +148,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const currentPage = Math.min(page, totalPages);
 
   if (currentPage !== page) {
-    redirect(createAdminHref(currentPage, selectedTenantId));
+    redirect(
+      createAdminHref(currentPage, selectedTenantId, dateFrom, dateTo),
+    );
   }
 
   const metrics = [
@@ -201,6 +223,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
           <TenantSwitcher
             activeTenantId={selectedTenantId}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
             tenants={tenants}
           />
         </div>
@@ -208,6 +232,89 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       <main className="px-4 py-6 lg:ml-64 lg:px-8">
         <div className="mx-auto max-w-[1600px]">
+          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-blue-700">
+                <CalendarDays className="h-5 w-5" aria-hidden />
+              </span>
+              <div>
+                <h2 className="font-black">Rango de conciliación</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Filtra el dashboard y el reporte CSV por fecha de creación.
+                </p>
+              </div>
+            </div>
+
+            <form
+              action="/admin"
+              method="GET"
+              className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-end"
+            >
+              {selectedTenantId && (
+                <input type="hidden" name="tenant" value={selectedTenantId} />
+              )}
+              <label className="flex-1 text-sm font-bold text-slate-700">
+                Desde
+                <input
+                  type="date"
+                  name="from"
+                  defaultValue={dateFrom}
+                  max={dateTo}
+                  className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 font-medium text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                />
+              </label>
+              <label className="flex-1 text-sm font-bold text-slate-700">
+                Hasta
+                <input
+                  type="date"
+                  name="to"
+                  defaultValue={dateTo}
+                  min={dateFrom}
+                  className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 font-medium text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                />
+              </label>
+              <button
+                type="submit"
+                className="flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 text-sm font-bold text-white transition hover:bg-slate-800"
+              >
+                <Filter className="h-4 w-4" aria-hidden />
+                Aplicar filtros
+              </button>
+              {(dateFrom || dateTo) && (
+                <Link
+                  href={createAdminHref(1, selectedTenantId)}
+                  className="flex h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
+                >
+                  Limpiar fechas
+                </Link>
+              )}
+              {hasInvalidDateRange ? (
+                <span
+                  aria-disabled="true"
+                  className="flex h-11 cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-slate-200 px-5 text-sm font-bold text-slate-400"
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Exportar Reporte (CSV)
+                </span>
+              ) : (
+                <a
+                  href={createExportHref(selectedTenantId, dateFrom, dateTo)}
+                  download
+                  className="flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700"
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Exportar Reporte (CSV)
+                </a>
+              )}
+            </form>
+
+            {hasInvalidDateRange && (
+              <p className="mt-3 text-sm font-semibold text-rose-700" role="alert">
+                La fecha inicial no puede ser posterior a la fecha final.
+              </p>
+            )}
+          </section>
+
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => {
               const Icon = metric.icon;
@@ -345,12 +452,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
             <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
               <PaginationLink
+                dateFrom={dateFrom}
+                dateTo={dateTo}
                 page={currentPage - 1}
                 disabled={currentPage <= 1}
                 label="Anterior"
                 tenantId={selectedTenantId}
               />
               <PaginationLink
+                dateFrom={dateFrom}
+                dateTo={dateTo}
                 page={currentPage + 1}
                 disabled={currentPage >= totalPages}
                 label="Siguiente"
@@ -371,7 +482,12 @@ function getSingleSearchParam(value?: string | string[]) {
   return trimmedValue || undefined;
 }
 
-function createAdminHref(page: number, tenantId?: string | null) {
+function createAdminHref(
+  page: number,
+  tenantId?: string | null,
+  dateFrom?: string,
+  dateTo?: string,
+) {
   const params = new URLSearchParams();
 
   if (page > 1) {
@@ -382,8 +498,39 @@ function createAdminHref(page: number, tenantId?: string | null) {
     params.set("tenant", tenantId);
   }
 
+  if (dateFrom) {
+    params.set("from", dateFrom);
+  }
+
+  if (dateTo) {
+    params.set("to", dateTo);
+  }
+
   const queryString = params.toString();
   return queryString ? `/admin?${queryString}` : "/admin";
+}
+
+function createExportHref(
+  tenantId?: string | null,
+  dateFrom?: string,
+  dateTo?: string,
+) {
+  const params = new URLSearchParams();
+
+  if (tenantId) {
+    params.set("tenant", tenantId);
+  }
+
+  if (dateFrom) {
+    params.set("from", dateFrom);
+  }
+
+  if (dateTo) {
+    params.set("to", dateTo);
+  }
+
+  const queryString = params.toString();
+  return `/api/admin/transactions/export${queryString ? `?${queryString}` : ""}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -406,11 +553,15 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function PaginationLink({
+  dateFrom,
+  dateTo,
   disabled,
   label,
   page,
   tenantId,
 }: {
+  dateFrom?: string;
+  dateTo?: string;
   disabled: boolean;
   label: string;
   page: number;
@@ -426,7 +577,7 @@ function PaginationLink({
 
   return (
     <Link
-      href={createAdminHref(page, tenantId)}
+      href={createAdminHref(page, tenantId, dateFrom, dateTo)}
       className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
     >
       {label}

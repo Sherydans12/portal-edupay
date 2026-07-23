@@ -10,11 +10,15 @@ export type TenantSwitcherOption = {
 
 type TenantSwitcherProps = {
   activeTenantId?: string | null;
+  dateFrom?: string;
+  dateTo?: string;
   tenants: TenantSwitcherOption[];
 };
 
 export function TenantSwitcher({
   activeTenantId,
+  dateFrom,
+  dateTo,
   tenants,
 }: TenantSwitcherProps) {
   const router = useRouter();
@@ -24,6 +28,14 @@ export function TenantSwitcher({
 
     if (tenantId) {
       params.set("tenant", tenantId);
+    }
+
+    if (dateFrom) {
+      params.set("from", dateFrom);
+    }
+
+    if (dateTo) {
+      params.set("to", dateTo);
     }
 
     const queryString = params.toString();

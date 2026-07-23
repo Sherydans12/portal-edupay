@@ -33,7 +33,10 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white px-6 py-6 lg:block">
+      <aside
+        data-global-navigation
+        className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white px-6 py-6 lg:block"
+      >
         <BrandLogo />
         <SectionNav
           activeSection={activeSection}
@@ -51,7 +54,10 @@ export function DashboardLayout({
         </div>
       </aside>
 
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:ml-72 lg:px-8">
+      <header
+        data-global-navigation
+        className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:ml-72 lg:px-8"
+      >
         <div className="flex items-center justify-between gap-4">
           <div className="lg:hidden">
             <BrandLogo compact />
@@ -97,7 +103,10 @@ function SectionNav({
   onSectionChange: (section: ActiveSection) => void;
 }) {
   return (
-    <nav className={`${className} ${compact ? "" : "space-y-2"}`}>
+    <nav
+      data-global-navigation
+      className={`${className} ${compact ? "" : "space-y-2"}`}
+    >
       {sectionItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeSection === item.key;

@@ -24,3 +24,57 @@ button,
 input {
   font: inherit;
 }
+
+@media print {
+  @page {
+    size: auto;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    min-height: auto !important;
+    background: #ffffff !important;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  [data-global-navigation],
+  .print-hidden {
+    display: none !important;
+  }
+
+  .voucher-page {
+    min-height: auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .voucher-receipt {
+    max-width: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .voucher-content {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  .voucher-table-wrapper {
+    overflow: visible !important;
+  }
+
+  .voucher-items-table {
+    min-width: 0 !important;
+  }
+
+  .voucher-items-table tr {
+    break-inside: avoid;
+  }
+}

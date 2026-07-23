@@ -6,6 +6,13 @@ type InitWebpayPayload = {
   amount: number;
   sessionId: string;
   edupayPayload: number[];
+  receiptItems: Array<{
+    installmentId: number;
+    studentName: string;
+    concept: string;
+    month: string;
+    amount: number;
+  }>;
 };
 
 applyPortalEnv();
@@ -43,6 +50,10 @@ test("Un apoderado inicia sesion, selecciona una cuota y paga con Webpay", async
     expect(payload.sessionId).toMatch(/^portal-multi-/);
     expect(payload.edupayPayload.length).toBeGreaterThan(0);
     expect(payload.edupayPayload.every(Number.isInteger)).toBe(true);
+    expect(payload.receiptItems).toHaveLength(payload.edupayPayload.length);
+    expect(
+      payload.receiptItems.reduce((total, item) => total + item.amount, 0),
+    ).toBe(payload.amount);
 
     const guardian = await prisma.guardianUser.findFirstOrThrow({
       where: {
@@ -62,6 +73,7 @@ test("Un apoderado inicia sesion, selecciona una cuota y paga con Webpay", async
         status: "AUTHORIZED",
         authorizationCode: "E2E-AUTH",
         edupayPayload: payload.edupayPayload,
+        receiptItems: payload.receiptItems,
         edupaySynced: true,
       },
     });
@@ -73,7 +85,7 @@ test("Un apoderado inicia sesion, selecciona una cuota y paga con Webpay", async
       contentType: "application/json",
       body: JSON.stringify({
         url: "https://webpay.e2e.test/webpay-plus",
-        token: tokenWs,
+        token_ws: tokenWs,
       }),
     });
   });
@@ -130,5 +142,10 @@ test("Un apoderado inicia sesion, selecciona una cuota y paga con Webpay", async
   await expect(page).toHaveURL(new RegExp(`/voucher\\?token_ws=${tokenWs}$`));
   await expect(page.getByRole("heading", { name: /Pago aprobado/i })).toBeVisible();
   await expect(page.getByText("E2E-AUTH")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Imprimir / Guardar Comprobante" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cuotas pagadas" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Alumno" })).toBeVisible();
   expect(initRequestPayload).not.toBeNull();
 });

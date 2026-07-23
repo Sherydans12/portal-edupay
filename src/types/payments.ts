@@ -8,6 +8,14 @@ export type InstallmentStatus = EdupayInstallmentStatus;
 export type Installment = EdupayInstallment;
 export type Student = EdupayStudent;
 
+export type PaymentReceiptItem = {
+  installmentId: number;
+  studentName: string;
+  concept: string;
+  month: string;
+  amount: number;
+};
+
 export type Guardian = {
   id: string;
   name: string;
