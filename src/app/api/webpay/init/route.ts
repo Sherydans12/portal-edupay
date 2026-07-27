@@ -14,6 +14,8 @@ import {
 import { webpayTransaction } from "@/lib/transbank";
 import type { PaymentReceiptItem } from "@/types/payments";
 
+const MINIMUM_WEBPAY_AMOUNT = 50;
+
 type InitWebpayBody = {
   amount?: unknown;
   sessionId?: unknown;
@@ -63,7 +65,7 @@ export async function POST(request: Request) {
 
   if (
     !Number.isInteger(amount) ||
-    amount <= 0 ||
+    amount < MINIMUM_WEBPAY_AMOUNT ||
     typeof body.sessionId !== "string" ||
     body.sessionId.trim().length === 0 ||
     !Array.isArray(body.edupayPayload) ||

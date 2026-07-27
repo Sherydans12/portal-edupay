@@ -11,10 +11,10 @@ const webpayEnvironment = (
   process.env.WEBPAY_ENV ??
   ""
 )
-  .trim()
-  .toUpperCase();
+  .toLowerCase()
+  .trim();
 
-const isProduction = webpayEnvironment === "PRODUCTION";
+const isProduction = webpayEnvironment === "production";
 
 function getProductionCredentials() {
   const commerceCode = process.env.WEBPAY_COMMERCE_CODE?.trim();
