@@ -93,6 +93,7 @@ model EmailLog {
   type      EmailType
   status    EmailStatus
   error     String?
+  body      String?    @db.Text
   createdAt DateTime    @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])

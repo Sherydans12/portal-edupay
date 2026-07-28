@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import {
   Eye,
+  FileText,
   Filter,
   LayoutDashboard,
   Mail,
@@ -95,6 +96,7 @@ export default async function AdminEmailsPage({
         type: true,
         status: true,
         error: true,
+        body: true,
         createdAt: true,
         tenant: {
           select: {
@@ -313,6 +315,19 @@ export default async function AdminEmailsPage({
                               </span>{" "}
                               {emailLog.error ?? "Sin error reportado."}
                             </p>
+                            {(emailLog.status === EmailStatus.FAILED ||
+                              emailLog.status === EmailStatus.SIMULATED) && (
+                              <div className="mt-3 border-t border-slate-200 pt-3">
+                                <p className="flex items-center gap-1.5 font-bold text-slate-800">
+                                  <FileText className="h-3.5 w-3.5" aria-hidden />
+                                  Cuerpo registrado
+                                </p>
+                                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-white p-2 font-mono text-[11px] leading-5 text-slate-600">
+                                  {emailLog.body ??
+                                    "No hay cuerpo almacenado para este registro histórico."}
+                                </pre>
+                              </div>
+                            )}
                           </div>
                         </details>
                       </td>

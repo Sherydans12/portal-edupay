@@ -1,9 +1,8 @@
 "use client";
 
-import { Download, Receipt } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Printer, ReceiptText, X } from "lucide-react";
+import { CheckCircle2, Download, Printer, ReceiptText, X } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { generateReceipt } from "@/lib/pdfGenerator";
 import type { Installment, Student } from "@/types/payments";
@@ -36,11 +35,14 @@ export function PaymentHistory({ student }: PaymentHistoryProps) {
 
       {paidInstallments.length === 0 ? (
         <div className="mt-6 flex flex-col items-center justify-center rounded-[8px] border border-dashed border-slate-200 bg-slate-50 px-4 py-12 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-[8px] bg-white text-slate-400 shadow-sm">
-            <Receipt className="h-8 w-8" aria-hidden />
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-sm">
+            <CheckCircle2 className="h-8 w-8" aria-hidden />
           </div>
-          <p className="mt-4 max-w-sm text-sm font-semibold leading-6 text-slate-500">
-            A£n no tienes registros de pagos hist¢ricos.
+          <p className="mt-4 max-w-sm text-base font-black leading-6 text-emerald-900">
+            ¬°Al d√≠a! No registras deudas pendientes.
+          </p>
+          <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
+            Todav√≠a no tienes pagos registrados en el historial.
           </p>
         </div>
       ) : (
@@ -50,7 +52,7 @@ export function PaymentHistory({ student }: PaymentHistoryProps) {
           <span>Concepto</span>
           <span>Monto</span>
           <span>Orden</span>
-          <span>Acci¢n</span>
+          <span>Acci√≥n</span>
         </div>
 
         {paidInstallments.map((installment) => (
@@ -105,6 +107,7 @@ export function PaymentHistory({ student }: PaymentHistoryProps) {
     </section>
   );
 }
+
 type PaymentReceiptModalProps = {
   installment: Installment;
   studentName: string;
@@ -177,18 +180,18 @@ function PaymentReceiptModal({
 
           <div className="voucher-content px-6 py-7 sm:px-8">
             <p className="text-sm leading-6 text-slate-600">
-              Transbank autoriz¢ la operaci¢n. Conserva este comprobante como respaldo de tu pago.
+              Transbank autoriz√≥ la operaci√≥n. Conserva este comprobante como respaldo de tu pago.
             </p>
 
             <dl className="mt-7 grid divide-y divide-dashed divide-slate-200 border-y border-dashed border-slate-300 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
               <div className="sm:pr-6">
                 <ReceiptRow label="Fecha y hora" value={receiptDateFormatter.format(new Date(paymentDate))} />
                 <ReceiptRow label="Medio de pago" value="Webpay Plus" />
-                <ReceiptRow label="Èltimos 4 d°gitos" value="No disponible" />
+                <ReceiptRow label="√öltimos 4 d√≠gitos" value="No disponible" />
               </div>
               <div className="sm:pl-6">
                 <ReceiptRow label="Orden de compra" value={buyOrder} />
-                <ReceiptRow label="C¢digo de autorizaci¢n" value={installment.authorizationCode ?? "No disponible"} />
+                <ReceiptRow label="C√≥digo de autorizaci√≥n" value={installment.authorizationCode ?? "No disponible"} />
                 <ReceiptRow label="Cuotas de la tarjeta" value="No disponible" />
               </div>
             </dl>

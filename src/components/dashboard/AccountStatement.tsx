@@ -1,6 +1,12 @@
 "use client";
 
-import { CheckCircle, CreditCard, GraduationCap, Loader2 } from "lucide-react";
+import {
+  CheckCircle,
+  CheckCircle2,
+  CreditCard,
+  GraduationCap,
+  Loader2,
+} from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { EdupayStatementResponse } from "@/lib/edupay";
 import type { Installment, InstallmentStatus, Student } from "@/types/payments";
@@ -67,14 +73,14 @@ export function StudentSelector({
               }`}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <StudentIcon />
-                  <div>
+                  <div className="min-w-0">
                     <h2 className="font-black text-slate-950">{student.name}</h2>
                     <p className="text-sm text-slate-500">{student.course}</p>
                   </div>
                 </div>
-                <span className="w-fit rounded-full border border-tenant-secondary/40 bg-tenant-secondary/10 px-3 py-1 text-xs font-bold text-tenant-primary">
+                <span className="w-fit max-w-full truncate rounded-full border border-tenant-secondary/40 bg-tenant-secondary/10 px-3 py-1 text-xs font-bold text-tenant-primary">
                   {formatCurrency(debt)}
                 </span>
               </div>
@@ -138,21 +144,21 @@ export function AccountStatement({
       </div>
 
       <div>
-        <div>
-          {statement.students.length === 0 ? (
-            <EmptyStudents />
-          ) : (
-            statement.students.map((student) => (
-              <StudentStatementCard
-                key={student.id}
-                student={student}
-                selectedCuotas={selectedCuotas}
-                isCreatingTransaction={isCreatingTransaction}
-                onToggleInstallment={onToggleInstallment}
-              />
-            ))
-          )}
-        </div>
+        {statement.students.length === 0 ? (
+          <EmptyStudents />
+        ) : totalDebt === 0 ? (
+          <EmptyDebtState />
+        ) : (
+          statement.students.map((student) => (
+            <StudentStatementCard
+              key={student.id}
+              student={student}
+              selectedCuotas={selectedCuotas}
+              isCreatingTransaction={isCreatingTransaction}
+              onToggleInstallment={onToggleInstallment}
+            />
+          ))
+        )}
       </div>
 
       <PaymentBar
@@ -184,8 +190,8 @@ function StudentStatementCard({
 
   return (
     <article className="mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50 p-4 sm:p-5">
-        <div className="flex items-center gap-3">
+      <header className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
+        <div className="flex min-w-0 items-center gap-3">
           <StudentIcon />
           <div className="min-w-0">
             <h2 className="truncate text-lg font-bold text-tenant-primary">
@@ -199,7 +205,7 @@ function StudentStatementCard({
             </p>
           </div>
         </div>
-        <span className="shrink-0 rounded-full bg-tenant-primary/10 px-3 py-1.5 text-xs font-bold text-tenant-primary">
+        <span className="w-fit max-w-full truncate rounded-full bg-tenant-primary/10 px-3 py-1.5 text-xs font-bold text-tenant-primary">
           {student.course}
         </span>
       </header>
@@ -294,7 +300,7 @@ function InstallmentRow({
           />
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-black text-slate-950">
+              <span className="min-w-0 font-black text-slate-950">
                 Mensualidad {installment.month}
               </span>
               <StatusBadge status={installment.status} />
@@ -372,12 +378,29 @@ function EmptyStudents() {
   );
 }
 
+function EmptyDebtState() {
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-5 py-12 text-center shadow-sm sm:px-8">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-emerald-600 shadow-sm">
+        <CheckCircle2 className="h-9 w-9" aria-hidden />
+      </div>
+      <h2 className="mt-5 text-xl font-black text-emerald-900">
+        ¡Al día! No registras deudas pendientes.
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-emerald-800/80">
+        Tus cuotas están pagadas. Aquí podrás ver nuevas obligaciones cuando
+        sean registradas por el colegio.
+      </p>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: InstallmentStatus }) {
   const current = statusCopy[status];
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${current.className}`}
+      className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${current.className}`}
     >
       <span className={`h-2 w-2 rounded-full ${current.dotClassName}`} />
       {current.label}
@@ -427,6 +450,7 @@ function PaymentBar({
           type="button"
           disabled={selectedTotal === 0 || isCreatingTransaction}
           onClick={onStartWebpayTransaction}
+          aria-busy={isCreatingTransaction}
           className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-tenant-primary px-6 text-base font-bold text-white shadow-lg shadow-tenant-primary/20 transition hover:bg-tenant-primary/90 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:w-auto sm:min-w-56"
         >
           {isCreatingTransaction ? (
