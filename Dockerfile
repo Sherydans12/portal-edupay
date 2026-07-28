@@ -24,7 +24,9 @@ RUN npx prisma generate
 # Isolate static compilation from runtime services injected by Coolify.
 ENV NODE_OPTIONS="--max-old-space-size=3072"
 
-RUN chmod +x ./scripts/build-docker.sh && ./scripts/build-docker.sh
+RUN sed -i 's/\r$//' ./scripts/build-docker.sh && \
+  chmod +x ./scripts/build-docker.sh && \
+  sh ./scripts/build-docker.sh
 RUN npx tsc scripts/clean-prod.ts scripts/seed-demo.ts --module CommonJS --moduleResolution node --target ES2020 --outDir dist-scripts --esModuleInterop --skipLibCheck --noEmit false
 
 # Production image, copy the standalone server and runtime dependencies
