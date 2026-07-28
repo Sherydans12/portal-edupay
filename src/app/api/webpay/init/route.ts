@@ -15,6 +15,8 @@ import {
 import { webpayTransaction } from "@/lib/transbank";
 import type { PaymentReceiptItem } from "@/types/payments";
 
+export const dynamic = "force-dynamic";
+
 const MINIMUM_WEBPAY_AMOUNT = 50;
 
 type InitWebpayBody = {

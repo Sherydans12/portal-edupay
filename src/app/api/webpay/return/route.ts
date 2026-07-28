@@ -6,6 +6,8 @@ import { sendPaymentReceiptEmail } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 import { webpayTransaction } from "@/lib/transbank";
 
+export const dynamic = "force-dynamic";
+
 type WebpayCallbackParams = {
   tokenWs: string | null;
   tbkToken: string | null;
