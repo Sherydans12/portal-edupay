@@ -149,6 +149,29 @@ async function edupayFetch<T>(
   return payload;
 }
 
+/**
+ * Confirma que el servidor de EduPay responde usando las mismas credenciales
+ * que las integraciones del portal. Una respuesta 4xx confirma conectividad
+ * (por ejemplo, algunos gateways no exponen la raíz de la API); los errores
+ * 5xx y de red se consideran una dependencia no disponible.
+ */
+export async function checkEdupayConnection(): Promise<void> {
+  const config = getEdupayConfig();
+  const response = await fetch(config.apiUrl, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${config.apiToken}`,
+      "x-tenant-id": config.tenantId,
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(5_000),
+  });
+
+  if (response.status >= 500) {
+    throw new Error(`EduPay respondió ${response.status} al verificar conectividad`);
+  }
+}
+
 export async function verifyGuardianExists(rut: string): Promise<boolean> {
   const response = await edupayFetch<GuardianExistsResponse>(
     `/api/v1/portal/guardian/${encodeURIComponent(rut)}`,

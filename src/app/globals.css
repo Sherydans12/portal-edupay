@@ -77,4 +77,15 @@ input {
   .voucher-items-table tr {
     break-inside: avoid;
   }
+
+  .history-receipt-modal {
+    position: static !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body:has(> .history-receipt-modal) > *:not(.history-receipt-modal) {
+    display: none !important;
+  }
 }
