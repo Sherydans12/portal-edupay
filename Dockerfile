@@ -20,10 +20,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
-RUN NODE_OPTIONS="--max-old-space-size=3072" \
-  DATABASE_URL="postgresql://dummy:dummy@127.0.0.1:5432/dummy?schema=public" \
-  EDUPAY_API_URL="http://127.0.0.1:3001" \
-  npx next build || (echo "=== NEXT BUILD FAILED ===" && exit 1)
+
+# Isolate static compilation from runtime services injected by Coolify.
+ENV DATABASE_URL="postgresql://dummy:dummy@127.0.0.1:5432/dummy?schema=public"
+ENV EDUPAY_API_URL="http://127.0.0.1:3001"
+ENV NODE_OPTIONS="--max-old-space-size=3072"
+
+RUN npx next build
 RUN npx tsc scripts/clean-prod.ts scripts/seed-demo.ts --module CommonJS --moduleResolution node --target ES2020 --outDir dist-scripts --esModuleInterop --skipLibCheck --noEmit false
 
 # Production image, copy the standalone server and runtime dependencies
