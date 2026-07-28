@@ -17,6 +17,8 @@ import { formatCurrency } from "@/lib/format";
 import prisma from "@/lib/prisma";
 import type { PaymentReceiptItem } from "@/types/payments";
 
+export const dynamic = "force-dynamic";
+
 type VoucherPageProps = {
   searchParams: Promise<{
     token_ws?: string | string[];

@@ -21,6 +21,8 @@ import {
   normalizeReportDate,
 } from "@/lib/transaction-report";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 50;
 
 const moneyFormatter = new Intl.NumberFormat("es-CL", {

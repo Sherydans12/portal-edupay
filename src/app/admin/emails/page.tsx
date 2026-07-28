@@ -17,6 +17,8 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 25;
 const EMAIL_STATUSES = Object.values(EmailStatus);
 const EMAIL_TYPES = Object.values(EmailType);
