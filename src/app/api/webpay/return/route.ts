@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPublicAppUrl } from "@/lib/app-url";
+import { logCriticalError } from "@/lib/critical-error";
 import { getEdupayTenantId, syncPaymentWithEduPay } from "@/lib/edupay";
 import { sendPaymentReceiptEmail } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
@@ -80,6 +81,11 @@ async function handleCallback(
   try {
     response = (await webpayTransaction.commit(tokenWs)) as WebpayCommitResponse;
   } catch (error) {
+    logCriticalError({
+      path: "/api/webpay/return",
+      error,
+      buyOrder: localTransaction.buyOrder,
+    });
     localTransaction = await prisma.transaction.findFirst({
       where: { tokenWs, tenantId },
       include: { guardian: true },
@@ -98,12 +104,15 @@ async function handleCallback(
       try {
         response = (await webpayTransaction.status(tokenWs)) as WebpayCommitResponse;
       } catch (statusError) {
-        console.error("No se pudo recuperar una transacción ya confirmada", statusError);
+        logCriticalError({
+          path: "/api/webpay/return",
+          error: statusError,
+          buyOrder: localTransaction.buyOrder,
+        });
         voucherUrl.searchParams.set("status", "processing");
         return NextResponse.redirect(voucherUrl, 303);
       }
     } else {
-      console.error("Falló el commit de Webpay", error);
       await prisma.transaction.updateMany({
         where: { tokenWs, tenantId, status: { not: "AUTHORIZED" } },
         data: { status: "FAILED" },
@@ -119,13 +128,10 @@ async function handleCallback(
     (response.amount === undefined || response.amount === localTransaction.amount);
 
   if (isAuthorized && !responseMatchesLocalTransaction) {
-    console.error("La respuesta de Webpay no coincide con la intención local", {
-      tokenWs,
-      tenantId,
-      expectedBuyOrder: localTransaction.buyOrder,
-      receivedBuyOrder: response.buy_order,
-      expectedAmount: localTransaction.amount,
-      receivedAmount: response.amount,
+    logCriticalError({
+      path: "/api/webpay/return",
+      buyOrder: localTransaction.buyOrder,
+      error: new Error("La respuesta de Webpay no coincide con la intención local"),
     });
     await prisma.transaction.updateMany({
       where: { tokenWs, tenantId, status: { not: "AUTHORIZED" } },
@@ -195,7 +201,11 @@ async function handleCallback(
           });
         }
       } catch (error) {
-        console.error("No se pudo sincronizar el pago con EduPay", error);
+        logCriticalError({
+          path: "/api/webpay/return",
+          error,
+          buyOrder: updatedTransaction.buyOrder,
+        });
       }
     } else {
       console.error(

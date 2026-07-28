@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
+const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Keep the public DSN available to a future Sentry client only when configured.
+  ...(sentryDsn
+    ? { env: { NEXT_PUBLIC_SENTRY_DSN: sentryDsn } }
+    : {}),
   turbopack: {
     root: process.cwd(),
   },

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getPublicAppUrl } from "@/lib/app-url";
+import { logCriticalError } from "@/lib/critical-error";
 import { getEdupayTenantId } from "@/lib/edupay";
 import prisma from "@/lib/prisma";
 import {
@@ -102,12 +103,22 @@ export async function POST(request: Request) {
     getPublicAppUrl(request),
   ).toString();
   const buyOrder = `OC-${Date.now()}`;
-  const transbankResponse = await webpayTransaction.create(
-    buyOrder,
-    body.sessionId,
-    amount,
-    returnUrl,
-  );
+  let transbankResponse: Awaited<ReturnType<typeof webpayTransaction.create>>;
+
+  try {
+    transbankResponse = await webpayTransaction.create(
+      buyOrder,
+      body.sessionId,
+      amount,
+      returnUrl,
+    );
+  } catch (error) {
+    logCriticalError({ path: "/api/webpay/init", error, buyOrder });
+    return NextResponse.json(
+      { error: "No fue posible iniciar el pago. Intenta nuevamente." },
+      { status: 502 },
+    );
+  }
 
   await prisma.transaction.create({
     data: {
