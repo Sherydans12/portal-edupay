@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 type ErrorPageProps = {
   error: Error & { digest?: string };
@@ -38,12 +39,12 @@ export function ErrorContent({ onRetry }: { onRetry: () => void }) {
           >
             Reintentar
           </button>
-          <a
+          <Link
             className="rounded-lg border border-slate-300 px-4 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:ring-offset-2"
             href="/"
           >
             Volver al inicio
-          </a>
+          </Link>
         </div>
       </section>
     </main>

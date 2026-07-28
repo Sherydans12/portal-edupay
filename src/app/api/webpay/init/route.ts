@@ -12,12 +12,16 @@ import {
   hashRateLimitIdentifier,
   type RateLimitResult,
 } from "@/lib/rate-limit";
-import { webpayTransaction } from "@/lib/transbank";
+import { getWebpayTransaction } from "@/lib/transbank";
 import type { PaymentReceiptItem } from "@/types/payments";
 
 export const dynamic = "force-dynamic";
 
 const MINIMUM_WEBPAY_AMOUNT = 50;
+
+type WebpayCreateResponse = Awaited<
+  ReturnType<ReturnType<typeof getWebpayTransaction>["create"]>
+>;
 
 type InitWebpayBody = {
   amount?: unknown;
@@ -105,10 +109,10 @@ export async function POST(request: Request) {
     getPublicAppUrl(request),
   ).toString();
   const buyOrder = `OC-${Date.now()}`;
-  let transbankResponse: Awaited<ReturnType<typeof webpayTransaction.create>>;
+  let transbankResponse: WebpayCreateResponse;
 
   try {
-    transbankResponse = await webpayTransaction.create(
+    transbankResponse = await getWebpayTransaction().create(
       buyOrder,
       body.sessionId,
       amount,

@@ -6,16 +6,6 @@ import {
   WebpayPlus,
 } from "transbank-sdk";
 
-const webpayEnvironment = (
-  process.env.WEBPAY_ENVIRONMENT ??
-  process.env.WEBPAY_ENV ??
-  ""
-)
-  .toLowerCase()
-  .trim();
-
-const isProduction = webpayEnvironment === "production";
-
 function getProductionCredentials() {
   const commerceCode = process.env.WEBPAY_COMMERCE_CODE?.trim();
   const apiKey = process.env.WEBPAY_API_KEY?.trim();
@@ -29,19 +19,24 @@ function getProductionCredentials() {
   return { commerceCode, apiKey };
 }
 
-const options = isProduction
-  ? (() => {
-      const { commerceCode, apiKey } = getProductionCredentials();
-      return new Options(commerceCode, apiKey, Environment.Production);
-    })()
-  : new Options(
-      IntegrationCommerceCodes.WEBPAY_PLUS,
-      IntegrationApiKeys.WEBPAY,
-      Environment.Integration,
-    );
+export function getWebpayTransaction() {
+  const webpayEnvironment = (
+    process.env.WEBPAY_ENVIRONMENT ??
+    process.env.WEBPAY_ENV ??
+    ""
+  )
+    .toLowerCase()
+    .trim();
+  const options = webpayEnvironment === "production"
+    ? (() => {
+        const { commerceCode, apiKey } = getProductionCredentials();
+        return new Options(commerceCode, apiKey, Environment.Production);
+      })()
+    : new Options(
+        IntegrationCommerceCodes.WEBPAY_PLUS,
+        IntegrationApiKeys.WEBPAY,
+        Environment.Integration,
+      );
 
-const tx = new WebpayPlus.Transaction(
-  options,
-);
-
-export { tx as webpayTransaction };
+  return new WebpayPlus.Transaction(options);
+}

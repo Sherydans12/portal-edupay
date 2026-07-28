@@ -4,7 +4,7 @@ import { logCriticalError } from "@/lib/critical-error";
 import { getEdupayTenantId, syncPaymentWithEduPay } from "@/lib/edupay";
 import { sendPaymentReceiptEmail } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
-import { webpayTransaction } from "@/lib/transbank";
+import { getWebpayTransaction } from "@/lib/transbank";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +78,7 @@ async function handleCallback(
     return NextResponse.redirect(voucherUrl, 303);
   }
 
+  const webpayTransaction = getWebpayTransaction();
   let response: WebpayCommitResponse;
 
   try {
