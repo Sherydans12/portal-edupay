@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { validatePortalPassword } from "@/lib/password";
 
 export async function POST(request: Request) {
   const { token, newPassword } = await request.json();
@@ -11,6 +12,12 @@ export async function POST(request: Request) {
       { error: "Token y nueva contraseña son obligatorios" },
       { status: 400 },
     );
+  }
+
+  const passwordError = validatePortalPassword(newPassword);
+
+  if (passwordError) {
+    return NextResponse.json({ error: passwordError }, { status: 400 });
   }
 
   const guardian = await prisma.guardianUser.findFirst({

@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  CalendarDays,
   CheckCircle,
   CheckCircle2,
+  CircleAlert,
   CreditCard,
   GraduationCap,
   Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { EdupayStatementResponse } from "@/lib/edupay";
@@ -53,8 +56,11 @@ export function StudentSelector({
 }: StudentSelectorProps) {
   return (
     <div className="mb-6">
-      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-tenant-secondary">
-        Alumnos vinculados
+      <p className="text-sm font-black text-tenant-primary">
+        Selecciona un estudiante
+      </p>
+      <p className="mt-1 text-sm text-slate-500">
+        El historial se actualizará con sus pagos y comprobantes.
       </p>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         {students.map((student) => {
@@ -117,31 +123,31 @@ export function AccountStatement({
   const hasSelectedCuotas = selectedCuotas.length > 0;
 
   return (
-    <div className={hasSelectedCuotas ? "pb-36 sm:pb-28" : ""}>
-      <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-tenant-secondary">
-            Portal de pagos
+    <div className={hasSelectedCuotas ? "pb-52 sm:pb-28" : ""}>
+      <header className="mb-6">
+        <h1 className="text-3xl font-black tracking-[-0.03em] text-tenant-primary sm:text-4xl">
+          {accountTitle}
+        </h1>
+        {hasMultipleStudents && (
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+            Revisa las cuotas de cada estudiante y reúne las que quieras pagar en una sola transacción.
           </p>
-          <h1 className="mt-2 text-2xl font-black text-tenant-primary sm:text-3xl">
-            {accountTitle}
-          </h1>
-          {hasMultipleStudents && (
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Selecciona cuotas de distintos alumnos y págalas juntas en una
-              sola transacción.
-            </p>
-          )}
+        )}
+      </header>
+
+      <section className="mb-6 overflow-hidden rounded-[14px] border border-slate-200 bg-white" aria-label="Proceso de pago">
+        <div className="grid divide-y divide-slate-200 md:grid-cols-3 md:divide-x md:divide-y-0">
+          <JourneyStep icon={CircleAlert} title="Tu situación" description="Entiende el total y lo que requiere atención." active />
+          <JourneyStep icon={CalendarDays} title="Revisa por estudiante" description="Selecciona las cuotas que deseas resolver." />
+          <JourneyStep icon={ShieldCheck} title="Pago seguro" description="Confirma tu selección y paga con Webpay." />
         </div>
-        <div className="rounded-xl bg-tenant-primary px-5 py-4 text-white">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
-            {hasMultipleStudents ? "Deuda familiar" : "Deuda total"}
-          </p>
-          <p className="mt-1 text-2xl font-black">
-            {formatCurrency(totalDebt)}
-          </p>
-        </div>
-      </div>
+      </section>
+
+      <section className="mb-7 grid overflow-hidden rounded-[14px] border border-slate-200 bg-white sm:grid-cols-3" aria-label="Resumen familiar">
+        <SummaryItem label={hasMultipleStudents ? "Deuda familiar" : "Deuda total"} value={formatCurrency(totalDebt)} />
+        <SummaryItem label="Pendiente por pagar" value={formatCurrency(totalDebt)} emphasis />
+        <SummaryItem label="Próximo vencimiento" value={getNextDueDate(allInstallments)} detail />
+      </section>
 
       <div>
         {statement.students.length === 0 ? (
@@ -189,12 +195,12 @@ function StudentStatementCard({
   const studentDebt = getDebt(student.installments);
 
   return (
-    <article className="mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
+    <article className="mb-6 overflow-hidden rounded-[14px] border border-slate-200 bg-white transition-shadow hover:shadow-[0_18px_38px_rgba(20,34,76,0.06)]">
+      <header className="flex flex-col gap-3 border-b border-slate-200 bg-[#fbfcff] p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
         <div className="flex min-w-0 items-center gap-3">
           <StudentIcon />
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-bold text-tenant-primary">
+            <h2 className="truncate text-lg font-black text-tenant-primary">
               {student.name}
             </h2>
             <p className="truncate text-sm text-slate-500">
@@ -205,7 +211,7 @@ function StudentStatementCard({
             </p>
           </div>
         </div>
-        <span className="w-fit max-w-full truncate rounded-full bg-tenant-primary/10 px-3 py-1.5 text-xs font-bold text-tenant-primary">
+        <span className="w-fit max-w-full truncate rounded-full border border-tenant-primary/15 bg-white px-3 py-1.5 text-xs font-black text-tenant-primary">
           {student.course}
         </span>
       </header>
@@ -262,7 +268,7 @@ function InstallmentRow({
       className={`block border-b border-slate-100 px-4 py-4 transition last:border-none md:grid md:min-w-[760px] md:grid-cols-[56px_1fr_150px_130px_140px] md:items-center md:gap-3 ${
         isPaid
           ? "cursor-not-allowed bg-slate-50 opacity-60"
-          : "cursor-pointer bg-white hover:bg-slate-50"
+          : "cursor-pointer bg-white hover:bg-[#fffdf7]"
       }`}
     >
       <span className="hidden items-center md:flex">
@@ -358,7 +364,7 @@ function InstallmentCheckbox({
 
 function StudentIcon() {
   return (
-    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] bg-tenant-primary/10 text-tenant-primary">
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-tenant-primary/10 bg-[#f2f5ff] text-tenant-primary">
       <GraduationCap className="h-5 w-5" aria-hidden />
     </div>
   );
@@ -424,24 +430,29 @@ function PaymentBar({
   return (
     <div
       aria-hidden={!isVisible}
-      className={`fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-all duration-300 ease-out lg:left-72 ${
+      className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 border-t border-tenant-secondary/50 bg-[#fffdf7] px-3 py-2.5 shadow-[0_-14px_36px_rgba(20,34,76,0.12)] transition-all duration-300 ease-out sm:bottom-0 sm:p-4 lg:left-72 ${
         isVisible
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-full opacity-0"
       }`}
     >
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-end justify-between gap-6 sm:justify-start">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 sm:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col justify-center sm:flex-row sm:items-end sm:justify-start sm:gap-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-              {selectedCount} {selectedCount === 1 ? "cuota" : "cuotas"}{" "}
-              {selectedCount === 1 ? "seleccionada" : "seleccionadas"}
+            <p className="text-xs font-black uppercase tracking-[0.1em] text-slate-500">
+              <span className="sm:hidden">
+                {selectedCount} seleccionada{selectedCount === 1 ? "" : "s"}
+              </span>
+              <span className="hidden sm:inline">
+                {selectedCount} {selectedCount === 1 ? "cuota" : "cuotas"}{" "}
+                {selectedCount === 1 ? "seleccionada" : "seleccionadas"}
+              </span>
             </p>
-            <p className="mt-1 text-sm font-semibold text-slate-600">
+            <p className="mt-1 hidden text-sm font-semibold text-slate-600 sm:block">
               Total a pagar
             </p>
           </div>
-          <p className="text-3xl font-black tracking-tight text-tenant-primary sm:text-4xl">
+          <p className="text-2xl font-black tracking-[-0.03em] text-tenant-primary sm:text-4xl">
             {formatCurrency(selectedTotal)}
           </p>
         </div>
@@ -451,7 +462,7 @@ function PaymentBar({
           disabled={selectedTotal === 0 || isCreatingTransaction}
           onClick={onStartWebpayTransaction}
           aria-busy={isCreatingTransaction}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-tenant-primary px-6 text-base font-bold text-white shadow-lg shadow-tenant-primary/20 transition hover:bg-tenant-primary/90 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:w-auto sm:min-w-56"
+          className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-tenant-primary px-4 text-sm font-black text-white shadow-lg shadow-tenant-primary/20 transition hover:-translate-y-0.5 hover:bg-tenant-primary/90 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none sm:min-w-56 sm:px-6 sm:text-base"
         >
           {isCreatingTransaction ? (
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
@@ -463,6 +474,34 @@ function PaymentBar({
       </div>
     </div>
   );
+}
+
+function JourneyStep({ icon: Icon, title, description, active = false }: { icon: typeof CircleAlert; title: string; description: string; active?: boolean }) {
+  return (
+    <div className={`flex items-start gap-3 p-4 sm:p-5 ${active ? "bg-[#fffaf0]" : "bg-white"}`}>
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${active ? "bg-tenant-secondary text-tenant-primary" : "bg-tenant-primary/8 text-tenant-primary"}`}>
+        <Icon className="h-4.5 w-4.5" aria-hidden />
+      </span>
+      <div>
+        <h2 className="text-sm font-black text-tenant-primary">{title}</h2>
+        <p className="mt-0.5 text-xs leading-5 text-slate-600">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function SummaryItem({ label, value, emphasis = false, detail = false }: { label: string; value: string; emphasis?: boolean; detail?: boolean }) {
+  return (
+    <div className={`p-5 sm:p-6 ${emphasis ? "bg-[#fffaf0]" : "bg-white"}`}>
+      <p className="text-xs font-black uppercase tracking-[0.1em] text-slate-500">{label}</p>
+      <p className={`mt-2 ${detail ? "text-lg" : "text-2xl sm:text-3xl"} font-black tracking-[-0.03em] ${emphasis ? "text-[#c88200]" : "text-tenant-primary"}`}>{value}</p>
+    </div>
+  );
+}
+
+function getNextDueDate(installments: Installment[]) {
+  const next = installments.find((installment) => installment.status !== "PAGADO");
+  return next ? formatDate(next.dueDate) : "Sin cuotas pendientes";
 }
 
 export function getDebt(installments: Installment[]) {

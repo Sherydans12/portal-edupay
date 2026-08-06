@@ -65,7 +65,8 @@ export default function ForgotPasswordPage() {
               Olvidé mi contraseña
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Ingresa tu RUT o email registrado.
+              Usa preferentemente tu RUT. Así consultaremos el correo vigente
+              directamente en EduPay.
             </p>
           </div>
 

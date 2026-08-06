@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
+import { AccountSettings } from "@/components/account/AccountSettings";
 import {
   AccountStatement,
   StudentSelector,
@@ -27,6 +29,7 @@ type PortalAppProps = {
 
 export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   const { data: session, status } = useSession();
+  const searchParams = useSearchParams();
   const guardian: Guardian = statement
     ? {
         ...statement.guardian,
@@ -39,7 +42,9 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
         email: session?.user?.email ?? "",
         students: [],
       };
-  const [activeSection, setActiveSection] = useState<ActiveSection>("account");
+  const [activeSection, setActiveSection] = useState<ActiveSection>(
+    searchParams.get("section") === "profile" ? "profile" : "account",
+  );
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     guardian.students[0]?.id ?? "",
   );
@@ -61,6 +66,19 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
 
   function handleSelectStudent(studentId: string) {
     setSelectedStudentId(studentId);
+  }
+
+  function handleSectionChange(section: ActiveSection) {
+    setActiveSection(section);
+    const url = new URL(window.location.href);
+
+    if (section === "profile") {
+      url.searchParams.set("section", "profile");
+    } else {
+      url.searchParams.delete("section");
+    }
+
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
   }
 
   function toggleInstallment(installment: Installment) {
@@ -166,12 +184,12 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
     return <PortalSkeleton />;
   }
 
-  if (!statement) {
+  if (!statement && activeSection !== "profile") {
     return (
       <DashboardLayout
         guardian={guardian}
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
         onLogout={handleLogout}
       >
         <section className="mx-auto max-w-6xl" aria-live="polite">
@@ -210,11 +228,11 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
       <DashboardLayout
         guardian={guardian}
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
         onLogout={handleLogout}
       >
         <section className="mx-auto max-w-6xl">
-        {activeSection === "account" && (
+        {activeSection === "account" && statement && (
           <AccountStatement
             statement={statement}
             selectedCuotas={selectedCuotas}
@@ -239,6 +257,14 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
           <CertificatesManager
             students={guardian.students}
             guardianRut={guardian.rut}
+          />
+        )}
+
+        {activeSection === "profile" && (
+          <AccountSettings
+            fallbackName={guardian.name}
+            fallbackRut={guardian.rut}
+            fallbackEmail={guardian.email}
           />
         )}
         </section>

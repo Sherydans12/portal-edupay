@@ -6,6 +6,7 @@ import {
   verifyGuardianExists,
 } from "@/lib/edupay";
 import prisma from "@/lib/prisma";
+import { validatePortalPassword } from "@/lib/password";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,6 +30,12 @@ export async function POST(request: Request) {
       { error: "Ingresa un email válido" },
       { status: 400 },
     );
+  }
+
+  const passwordError = validatePortalPassword(password);
+
+  if (passwordError) {
+    return NextResponse.json({ error: passwordError }, { status: 400 });
   }
 
   const guardianExistsInEduPay = await verifyGuardianExists(cleanRut);

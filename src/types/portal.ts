@@ -1,6 +1,6 @@
 import type { Installment } from "@/types/payments";
 
-export type ActiveSection = "account" | "history" | "certificates";
+export type ActiveSection = "account" | "history" | "certificates" | "profile";
 export type PaymentState = "IDLE" | "TRANSACTION" | "RECEIPT";
 
 export type PaymentSnapshot = {

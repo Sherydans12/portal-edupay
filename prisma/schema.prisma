@@ -22,20 +22,40 @@ model Tenant {
 }
 
 model GuardianUser {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId         String
-  rut              String
-  email            String?
-  passwordHash     String
-  lastLogin        DateTime?
-  resetToken       String?
-  resetTokenExpiry DateTime?
-  createdAt        DateTime  @default(now())
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId               String
+  rut                    String
+  email                  String?
+  passwordHash           String
+  lastLogin              DateTime?
+  resetToken             String?
+  resetTokenExpiry       DateTime?
+  pendingEmail           String?
+  emailChangeTokenHash   String?   @unique
+  emailChangeTokenExpiry DateTime?
+  edupayUpdatedAt        DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   transactions Transaction[]
 
   @@unique([tenantId, rut])
+}
+
+model EdupayWebhookEvent {
+  eventId       String   @id @db.Uuid
+  tenantId      String
+  type          String
+  guardianRut   String
+  guardianEmail String
+  source        String
+  occurredAt    DateTime
+  processedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, guardianRut])
+  @@index([createdAt])
 }
 
 model AdminUser {
@@ -93,7 +113,7 @@ model EmailLog {
   type      EmailType
   status    EmailStatus
   error     String?
-  body      String?    @db.Text
+  body      String?     @db.Text
   createdAt DateTime    @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])

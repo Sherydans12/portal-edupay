@@ -2,6 +2,7 @@
 
 import { Download } from "lucide-react";
 import { generateReceipt } from "@/lib/pdfGenerator";
+import type { PaymentReceiptItem } from "@/types/payments";
 
 type VoucherDownloadButtonProps = {
   amount: number;
@@ -9,6 +10,9 @@ type VoucherDownloadButtonProps = {
   authorizationCode: string | null;
   paymentDate: string;
   isAuthorized: boolean;
+  items: PaymentReceiptItem[];
+  cardLastFour: string | null;
+  installmentsNumber: number | null;
 };
 
 export function VoucherDownloadButton({
@@ -17,17 +21,25 @@ export function VoucherDownloadButton({
   authorizationCode,
   paymentDate,
   isAuthorized,
+  items,
+  cardLastFour,
+  installmentsNumber,
 }: VoucherDownloadButtonProps) {
   return (
     <button
       type="button"
       onClick={() =>
-        generateReceipt(
+        void generateReceipt(
           amount,
           buyOrder,
           authorizationCode,
           paymentDate,
           isAuthorized,
+          {
+            items,
+            cardLastFour,
+            installmentsNumber,
+          },
         )
       }
       className="flex h-12 w-full items-center justify-center gap-2 rounded-[8px] border border-tenant-primary/25 bg-white px-4 text-sm font-bold text-tenant-primary transition hover:border-tenant-primary hover:bg-tenant-primary/5"
