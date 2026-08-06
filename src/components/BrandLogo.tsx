@@ -6,9 +6,10 @@ import { tenants } from "@/data/tenants";
 
 type BrandLogoProps = {
   compact?: boolean;
+  inverse?: boolean;
 };
 
-export function BrandLogo({ compact = false }: BrandLogoProps) {
+export function BrandLogo({ compact = false, inverse = false }: BrandLogoProps) {
   const [imageError, setImageError] = useState(false);
   const currentTenant = tenants["conquistadores"];
 
@@ -34,7 +35,9 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
           <p className="text-xs font-black uppercase tracking-[0.14em] text-tenant-secondary">
             Colegio
           </p>
-          <p className="text-lg font-black text-tenant-primary">
+          <p
+            className={`text-lg font-black ${inverse ? "text-white" : "text-tenant-primary"}`}
+          >
             Conquistadores
           </p>
         </div>
