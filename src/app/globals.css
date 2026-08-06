@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  --background: #f8f9fb;
+  --foreground: #14224c;
 }
 
 @theme inline {
@@ -11,13 +11,18 @@
   --color-tenant-primary: var(--tenant-primary);
   --color-tenant-secondary: var(--tenant-secondary);
   --color-tenant-bg: var(--tenant-bg);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-nunito-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--tenant-secondary) 36%, white);
+  color: var(--tenant-primary);
 }
 
 button,

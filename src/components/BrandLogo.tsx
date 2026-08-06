@@ -18,10 +18,10 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
         <Image
           src={currentTenant.logoUrl}
           alt={`Logo ${currentTenant.name}`}
-          width={compact ? 38 : 56}
-          height={compact ? 38 : 56}
+          width={compact ? 42 : 64}
+          height={compact ? 42 : 64}
           priority
-          className="h-10 w-10 rounded-lg object-contain sm:h-12 sm:w-12"
+          className={`${compact ? "h-10 w-10" : "h-14 w-14"} object-contain`}
           onError={() => setImageError(true)}
         />
       ) : (
@@ -31,10 +31,10 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
       )}
       {!compact && (
         <div className="leading-tight">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-tenant-secondary">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-tenant-secondary">
             Colegio
           </p>
-          <p className="text-xl font-black text-tenant-primary">
+          <p className="text-lg font-black text-tenant-primary">
             Conquistadores
           </p>
         </div>

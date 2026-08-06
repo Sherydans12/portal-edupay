@@ -15,7 +15,7 @@ export const tenants: Record<string, TenantConfig> = {
     id: "tenant_01",
     name: "Colegio Conquistadores",
     domain: "conquistadores.edupay.cl",
-    logoUrl: "/logo.png",
+    logoUrl: "/logo-conquistadores.png",
     colors: {
       primary: "#1a2779",
       secondary: "#e8b04d",
