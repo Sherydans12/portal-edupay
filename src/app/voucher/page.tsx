@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { VoucherDownloadButton } from "@/app/voucher/VoucherDownloadButton";
 import { VoucherPrintButton } from "@/app/voucher/VoucherPrintButton";
+import { InstitutionalDocumentHeader } from "@/components/documents/InstitutionalDocumentHeader";
 import {
   getEdupayTenantId,
   getGuardianStatement,
@@ -29,8 +30,12 @@ type VoucherPageProps = {
 type VoucherStateVariant = "info" | "warning" | "error" | "neutral";
 
 const dateFormatter = new Intl.DateTimeFormat("es-CL", {
-  dateStyle: "long",
-  timeStyle: "short",
+  day: "2-digit",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
   timeZone: "America/Santiago",
 });
 
@@ -138,28 +143,23 @@ export default async function VoucherPage({ searchParams }: VoucherPageProps) {
 
   return (
     <main className="voucher-page flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 text-slate-900">
-      <section className="voucher-receipt w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
-        <header className="bg-emerald-700 px-6 py-7 text-white sm:px-8">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/15">
-              <CircleCheckBig className="h-8 w-8" aria-hidden />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/75">
-                Comprobante Webpay Plus
-              </p>
-              <h1 className="mt-1 text-2xl font-black sm:text-3xl">
-                Pago aprobado
-              </h1>
-            </div>
-          </div>
-        </header>
+      <section className="voucher-receipt w-full max-w-3xl overflow-hidden rounded-[14px] bg-white shadow-2xl shadow-slate-900/10">
+        <InstitutionalDocumentHeader
+          documentType="Comprobante de pago"
+          reference={transaction.buyOrder}
+        />
 
         <div className="voucher-content px-6 py-7 sm:px-8">
-          <p className="text-sm leading-6 text-slate-600">
-            Transbank autorizó la operación. Conserva este comprobante como
-            respaldo de tu pago.
-          </p>
+          <div className="flex items-start gap-3 rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-4">
+            <CircleCheckBig className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" aria-hidden />
+            <div>
+              <h1 className="font-black text-emerald-950">Pago aprobado</h1>
+              <p className="mt-1 text-sm leading-6 text-emerald-900/75">
+                Transbank autorizó la operación. Conserva este documento como
+                respaldo institucional de tu pago.
+              </p>
+            </div>
+          </div>
 
           <dl className="mt-7 grid divide-y divide-dashed divide-slate-200 border-y border-dashed border-slate-300 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
             <div className="sm:pr-6">
@@ -196,15 +196,15 @@ export default async function VoucherPage({ searchParams }: VoucherPageProps) {
           <section className="mt-7" aria-labelledby="paid-installments-title">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">
-                  Detalle del pago
-                </p>
                 <h2
                   id="paid-installments-title"
-                  className="mt-1 text-lg font-black text-slate-950"
+                  className="text-lg font-black text-tenant-primary"
                 >
-                  Cuotas pagadas
+                  Detalle del pago
                 </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Cuotas incluidas en esta operación.
+                </p>
               </div>
               <span className="text-sm font-semibold text-slate-500">
                 {receiptItems.length} {receiptItems.length === 1 ? "cuota" : "cuotas"}
@@ -263,11 +263,11 @@ export default async function VoucherPage({ searchParams }: VoucherPageProps) {
             </div>
           </section>
 
-          <div className="mt-6 flex items-end justify-between gap-4 rounded-xl bg-slate-100 p-5">
+          <div className="mt-6 flex items-end justify-between gap-4 rounded-[12px] bg-[#f4f6fb] p-5">
             <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
               Monto total
             </span>
-            <span className="text-2xl font-black text-slate-950 sm:text-3xl">
+            <span className="text-2xl font-black text-tenant-primary sm:text-3xl">
               {formatCurrency(transaction.amount)}
             </span>
           </div>
@@ -280,6 +280,9 @@ export default async function VoucherPage({ searchParams }: VoucherPageProps) {
               authorizationCode={transaction.authorizationCode}
               paymentDate={paymentDate}
               isAuthorized
+              items={receiptItems}
+              cardLastFour={transaction.cardLastFour}
+              installmentsNumber={transaction.installmentsNumber}
             />
             <Link
               href="/"
@@ -303,7 +306,7 @@ function RejectedTransactionState({
   paymentDate: Date;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-rose-50 px-4 py-10 text-slate-900">
+    <main className="flex min-h-screen items-center justify-center bg-rose-50 px-4 py-10">
       <section
         className="w-full max-w-lg rounded-2xl border border-rose-200 bg-white p-8 text-center shadow-xl shadow-rose-950/5"
         role="alert"
@@ -430,7 +433,7 @@ function ReceiptRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
       <dt className="text-sm font-medium text-slate-500">{label}</dt>
-      <dd className="m-0 break-all text-sm font-bold text-slate-950 sm:text-right">
+      <dd className="m-0 break-words text-sm font-bold text-slate-950 sm:text-right">
         {value}
       </dd>
     </div>
