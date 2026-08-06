@@ -29,6 +29,139 @@ export interface EdupayStatementResponse {
   students: EdupayStudent[];
 }
 
+export type EdupayGuardianProfile = {
+  exists: boolean;
+  id: number | null;
+  rut: string | null;
+  name: string | null;
+  email: string | null;
+  updatedAt: string | null;
+};
+
+function getDemoGuardianStatement(rut: string): EdupayStatementResponse {
+  const guardianRut = formatGuardianRut(rut);
+  const isRoberto = guardianRut === "11.111.111-1";
+
+  if (isRoberto) {
+    return {
+      guardian: {
+        id: guardianRut,
+        name: "Roberto Sánchez",
+        rut: guardianRut,
+        email: "roberto.sanchez@example.com",
+      },
+      students: [
+        {
+          id: "valentina-sanchez",
+          name: "Valentina Sánchez",
+          course: "1° Básico",
+          accountNumber: "11.111.111-1",
+          installments: [
+            {
+              id: 201,
+              month: "Marzo 2026",
+              dueDate: "2026-03-10",
+              status: "PAGADO",
+              amount: 125000,
+              paidAt: "2026-03-08",
+              purchaseOrder: "OC-26030901",
+              authorizationCode: "AUTH-112233",
+            },
+            {
+              id: 202,
+              month: "Abril 2026",
+              dueDate: "2026-04-10",
+              status: "PAGADO",
+              amount: 125000,
+              paidAt: "2026-04-07",
+              purchaseOrder: "OC-26041002",
+              authorizationCode: "AUTH-445566",
+            },
+            {
+              id: 203,
+              month: "Mayo 2026",
+              dueDate: "2026-05-10",
+              status: "PAGADO",
+              amount: 125000,
+              paidAt: "2026-05-08",
+              purchaseOrder: "OC-26050903",
+              authorizationCode: "AUTH-778899",
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  return {
+    guardian: {
+      id: guardianRut,
+      name: "Marcela Fuentes",
+      rut: guardianRut,
+      email: "marcela.fuentes@example.com",
+    },
+    students: [
+      {
+        id: "martina-fuentes",
+        name: "Martina Fuentes",
+        course: "3° Medio",
+        accountNumber: "12.345.678-9",
+        installments: [
+          {
+            id: 101,
+            month: "Marzo 2026",
+            dueDate: "2026-03-10",
+            status: "PAGADO",
+            amount: 162000,
+            paidAt: "2026-03-07",
+            purchaseOrder: "OC-26030701",
+            authorizationCode: "AUTH-349821",
+          },
+          {
+            id: 102,
+            month: "Abril 2026",
+            dueDate: "2026-04-10",
+            status: "VENCIDO",
+            amount: 162000,
+          },
+          {
+            id: 103,
+            month: "Mayo 2026",
+            dueDate: "2026-05-10",
+            status: "POR_VENCER",
+            amount: 162000,
+          },
+        ],
+      },
+      {
+        id: "tomas-fuentes",
+        name: "Tomás Fuentes",
+        course: "5° Básico",
+        accountNumber: "12.345.678-9",
+        installments: [
+          {
+            id: 104,
+            month: "Marzo 2026",
+            dueDate: "2026-03-10",
+            status: "PAGADO",
+            amount: 138000,
+            paidAt: "2026-03-09",
+            purchaseOrder: "OC-26030503",
+            authorizationCode: "AUTH-840221",
+          },
+          {
+            id: 105,
+            month: "Abril 2026",
+            dueDate: "2026-04-10",
+            status: "POR_VENCER",
+            amount: 138000,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 export interface EdupayPaymentSyncResponse {
   synced: boolean;
 }
@@ -41,13 +174,30 @@ export type EdupayPaymentSyncInput = {
   chargeIds: Array<string | number>;
 };
 
-type GuardianExistsResponse = {
-  exists: boolean;
-};
-
 type EdupayApiEnvelope<T> = {
   data: T;
 };
+
+type EdupayApiErrorPayload = {
+  message?: string | string[];
+  statusCode?: number;
+};
+
+export class EdupayApiError extends Error {
+  status: number;
+  payload: EdupayApiErrorPayload | null;
+
+  constructor(
+    message: string,
+    status: number,
+    payload: EdupayApiErrorPayload | null = null,
+  ) {
+    super(message);
+    this.name = "EdupayApiError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
 
 type EdupayRawStatementResponse = {
   guardian: {
@@ -131,8 +281,18 @@ async function edupayFetch<T>(
   });
 
   if (!response.ok) {
-    throw new Error(
-      `EduPay respondió ${response.status} al consultar ${path}`,
+    const payload = (await response.json().catch(() => null)) as
+      | EdupayApiErrorPayload
+      | null;
+    const remoteMessage = Array.isArray(payload?.message)
+      ? payload.message.join(". ")
+      : payload?.message;
+
+    throw new EdupayApiError(
+      remoteMessage ||
+        `EduPay respondió ${response.status} al consultar ${path}`,
+      response.status,
+      payload,
     );
   }
 
@@ -173,16 +333,74 @@ export async function checkEdupayConnection(): Promise<void> {
 }
 
 export async function verifyGuardianExists(rut: string): Promise<boolean> {
-  const response = await edupayFetch<GuardianExistsResponse>(
-    `/api/v1/portal/guardian/${encodeURIComponent(rut)}`,
-  );
+  const response = await getGuardianProfile(rut);
 
   return response.exists;
+}
+
+export function getGuardianProfile(
+  rut: string,
+  tenantId?: string,
+): Promise<EdupayGuardianProfile> {
+  if (process.env.EDUPAY_USE_DEMO_DATA === "true") {
+    const statement = getDemoGuardianStatement(rut);
+
+    return Promise.resolve({
+      exists: true,
+      id: normalizeRut(rut) === "111111111" ? 2 : 1,
+      rut: statement.guardian.rut,
+      name: statement.guardian.name,
+      email: statement.guardian.email,
+      updatedAt: "2026-07-30T16:20:00.000Z",
+    });
+  }
+
+  return edupayFetch<EdupayGuardianProfile>(
+    `/api/v1/portal/guardian/${encodeURIComponent(rut)}`,
+    undefined,
+    tenantId,
+  );
+}
+
+export function updateGuardianEmailInEduPay(
+  rut: string,
+  email: string,
+  expectedUpdatedAt: string,
+  tenantId?: string,
+): Promise<Exclude<EdupayGuardianProfile, { exists: false }>> {
+  if (process.env.EDUPAY_USE_DEMO_DATA === "true") {
+    const statement = getDemoGuardianStatement(rut);
+
+    return Promise.resolve({
+      exists: true,
+      id: normalizeRut(rut) === "111111111" ? 2 : 1,
+      rut: statement.guardian.rut,
+      name: statement.guardian.name,
+      email,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return edupayFetch<Exclude<EdupayGuardianProfile, { exists: false }>>(
+    `/api/v1/portal/guardian/${encodeURIComponent(rut)}/email`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, expectedUpdatedAt }),
+    },
+    tenantId,
+  );
 }
 
 export function getGuardianStatement(
   rut: string,
 ): Promise<EdupayStatementResponse> {
+  if (process.env.EDUPAY_USE_DEMO_DATA === "true") {
+    return Promise.resolve(getDemoGuardianStatement(rut));
+  }
+
   return edupayFetch<EdupayRawStatementResponse>(
     `/api/v1/portal/guardian/${encodeURIComponent(rut)}/statement`,
   ).then((statement) => ({

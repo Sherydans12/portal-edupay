@@ -181,6 +181,56 @@ export async function sendPasswordResetEmail(
   });
 }
 
+export async function sendEmailChangeVerification(
+  tenantId: string,
+  email: string,
+  token: string,
+) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? DEFAULT_APP_URL;
+  const verificationUrl = new URL("/verify-email", appUrl);
+  verificationUrl.searchParams.set("token", token);
+  const safeVerificationUrl = htmlEscape(verificationUrl.toString());
+  const logoUrl = htmlEscape(
+    new URL("/logo-conquistadores.png", appUrl).toString(),
+  );
+
+  await sendEmail({
+    tenantId,
+    to: email,
+    subject: "Confirma tu nuevo correo electrónico",
+    type: EmailType.SYSTEM,
+    simulationMessage: `Simulando confirmación de correo para ${email}. URL: ${verificationUrl.toString()}`,
+    failureMessage: "No fue posible enviar la verificación del correo",
+    html: `
+      <div style="margin:0;padding:32px 16px;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#14224c;line-height:1.6;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr><td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;border-collapse:collapse;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 16px 42px rgba(20,34,76,.10);">
+            <tr><td style="height:8px;background:#f2c300;"></td></tr>
+            <tr><td style="padding:26px 32px 22px;border-bottom:1px solid #e7eaf1;">
+              <img src="${logoUrl}" width="92" alt="Colegio Conquistadores" style="display:block;width:92px;height:auto;" />
+            </td></tr>
+            <tr><td style="padding:34px 32px 30px;">
+              <h1 style="margin:0;color:#14224c;font-size:27px;line-height:1.25;">Confirma tu nuevo correo</h1>
+              <p style="margin:14px 0 0;color:#526078;font-size:16px;">Solicitaste usar <strong style="color:#14224c;">${htmlEscape(email)}</strong> en tu cuenta del Portal de Pagos.</p>
+              <p style="margin:12px 0 0;color:#526078;font-size:15px;">Confirma que tienes acceso a esta dirección antes de actualizar la información institucional.</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;border-collapse:collapse;"><tr><td>
+                <a href="${safeVerificationUrl}" style="display:inline-block;padding:14px 22px;border-radius:10px;background:#142b72;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">Confirmar correo electrónico</a>
+              </td></tr></table>
+              <div style="padding:14px 16px;border-radius:10px;background:#fff8d9;color:#67520a;font-size:14px;"><strong>Este enlace vence en 60 minutos.</strong> El correo anterior seguirá activo hasta completar la confirmación.</div>
+              <p style="margin:24px 0 6px;color:#69758a;font-size:13px;">Si el botón no funciona, copia este enlace:</p>
+              <p style="margin:0;word-break:break-all;color:#142b72;font-size:12px;">${safeVerificationUrl}</p>
+              <p style="margin:24px 0 0;color:#69758a;font-size:13px;">Si no solicitaste este cambio, ignora este mensaje. No modificaremos tu cuenta.</p>
+            </td></tr>
+            <tr><td style="padding:20px 32px 26px;border-top:1px solid #e7eaf1;color:#7a8497;font-size:12px;">Colegio Particular Conquistadores · Portal de Pagos · Aprender con alegría</td></tr>
+          </table>
+        </td></tr></table>
+      </div>
+    `,
+  });
+
+  return verificationUrl.toString();
+}
+
 export async function sendPaymentReceiptEmail(
   email: string,
   tx: Transaction,

@@ -1,4 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
+import type { GuardianUser } from "@prisma/client";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { formatGuardianRut, getEdupayTenantId } from "@/lib/edupay";
@@ -26,26 +27,43 @@ export const authOptions: NextAuthOptions = {
         const isEmail = identifier.includes("@");
         const rut = isEmail ? "" : formatGuardianRut(identifier);
         const configuredTenantId = process.env.NEXT_PUBLIC_TENANT_ID;
-        const guardian = configuredTenantId
-          ? await prisma.guardianUser.findFirst({
-              where: {
-                tenantId: configuredTenantId,
-                tenant: {
-                  is: {
-                    isActive: true,
-                  },
-                },
-                ...(isEmail
-                  ? {
-                      email: {
-                        equals: identifier,
-                        mode: "insensitive" as const,
-                      },
-                    }
-                  : { rut }),
+        let guardian: GuardianUser | null = null;
+
+        if (configuredTenantId) {
+          const baseWhere = {
+            tenantId: configuredTenantId,
+            tenant: {
+              is: {
+                isActive: true,
               },
-            })
-          : null;
+            },
+          };
+
+          if (isEmail) {
+            const matchingGuardians = await prisma.guardianUser.findMany({
+              where: {
+                ...baseWhere,
+                email: {
+                  equals: identifier,
+                  mode: "insensitive" as const,
+                },
+              },
+              take: 2,
+            });
+
+            // EduPay permite correos compartidos. El correo solo puede
+            // identificar una cuenta cuando la coincidencia es inequívoca.
+            guardian =
+              matchingGuardians.length === 1 ? matchingGuardians[0] : null;
+          } else {
+            guardian = await prisma.guardianUser.findFirst({
+              where: {
+                ...baseWhere,
+                rut,
+              },
+            });
+          }
+        }
 
         if (guardian) {
           const tenantId = getEdupayTenantId();

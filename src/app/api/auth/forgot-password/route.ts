@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
+import type { GuardianUser } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { formatGuardianRut } from "@/lib/edupay";
+import { formatGuardianRut, getGuardianProfile } from "@/lib/edupay";
 import { sendPasswordResetEmail } from "@/lib/mailer";
 import prisma from "@/lib/prisma";
 
@@ -23,23 +24,71 @@ export async function POST(request: Request) {
     );
   }
 
-  const guardian = await prisma.guardianUser.findFirst({
-    where: {
-      tenant: { isActive: true },
-      OR: [
-        { rut: rutIdentifier },
-        {
-          email: {
-            equals: cleanIdentifier,
-            mode: "insensitive",
-          },
+  const configuredTenantId = process.env.NEXT_PUBLIC_TENANT_ID;
+  let guardian: GuardianUser | null = null;
+
+  if (isEmailIdentifier) {
+    const matches = await prisma.guardianUser.findMany({
+      where: {
+        ...(configuredTenantId ? { tenantId: configuredTenantId } : {}),
+        tenant: { isActive: true },
+        email: {
+          equals: cleanIdentifier,
+          mode: "insensitive",
         },
-      ],
-    },
-  });
+      },
+      take: 2,
+    });
+
+    guardian = matches.length === 1 ? matches[0] : null;
+  } else {
+    guardian = await prisma.guardianUser.findFirst({
+      where: {
+        ...(configuredTenantId ? { tenantId: configuredTenantId } : {}),
+        tenant: { isActive: true },
+        rut: rutIdentifier,
+      },
+    });
+  }
 
   if (guardian) {
-    if (!guardian.email || !EMAIL_PATTERN.test(guardian.email)) {
+    let deliveryEmail = guardian.email;
+
+    if (!isEmailIdentifier) {
+      try {
+        const profile = await getGuardianProfile(
+          guardian.rut,
+          guardian.tenantId,
+        );
+
+        if (
+          profile.exists &&
+          profile.email &&
+          EMAIL_PATTERN.test(profile.email)
+        ) {
+          deliveryEmail = profile.email.trim().toLowerCase();
+
+          if (deliveryEmail !== guardian.email) {
+            await prisma.guardianUser.update({
+              where: { id: guardian.id },
+              data: {
+                email: deliveryEmail,
+                edupayUpdatedAt: profile.updatedAt
+                  ? new Date(profile.updatedAt)
+                  : undefined,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        console.error(
+          "No se pudo reconciliar el correo de recuperación con EduPay:",
+          error instanceof Error ? error.message : "Error desconocido",
+        );
+      }
+    }
+
+    if (!deliveryEmail || !EMAIL_PATTERN.test(deliveryEmail)) {
       return NextResponse.json(
         { error: "El usuario no tiene un correo configurado" },
         { status: 400 },
@@ -57,7 +106,7 @@ export async function POST(request: Request) {
       },
     });
 
-    await sendPasswordResetEmail(guardian.tenantId, guardian.email, token);
+    await sendPasswordResetEmail(guardian.tenantId, deliveryEmail, token);
   }
 
   return NextResponse.json({

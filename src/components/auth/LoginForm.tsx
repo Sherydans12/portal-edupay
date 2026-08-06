@@ -100,6 +100,9 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                 className="h-full w-full bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-400"
               />
             </span>
+            <span className="mt-2 block text-xs font-medium leading-5 text-slate-500">
+              Si el correo es compartido por más de una cuenta, utiliza tu RUT.
+            </span>
           </label>
 
           <label className="mt-5 block text-sm font-semibold text-slate-700">

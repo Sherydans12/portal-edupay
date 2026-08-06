@@ -145,7 +145,121 @@ test("Un apoderado inicia sesion, selecciona una cuota y paga con Webpay", async
   await expect(
     page.getByRole("button", { name: "Imprimir / Guardar Comprobante" }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cuotas pagadas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Detalle del pago" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Alumno" })).toBeVisible();
   expect(initRequestPayload).not.toBeNull();
+});
+
+test("Mi cuenta permite solicitar un nuevo correo y cambiar la contraseña", async ({
+  page,
+}) => {
+  await page.route("**/api/account/profile", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        profile: {
+          name: "Marcela Fuentes",
+          rut: guardianRut,
+          email: "marcela.fuentes@example.com",
+          updatedAt: "2026-07-30T16:20:00.000Z",
+          sourceStatus: "synced",
+          pendingEmail: null,
+          pendingEmailExpiresAt: null,
+        },
+      }),
+    });
+  });
+
+  await page.route("**/api/account/email-change", async (route) => {
+    const payload = JSON.parse(route.request().postData() ?? "{}") as {
+      email?: string;
+      currentPassword?: string;
+    };
+
+    expect(payload).toEqual({
+      email: "nuevo.correo@example.cl",
+      currentPassword: "demo123",
+    });
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        pendingEmail: payload.email,
+        expiresAt: "2026-07-30T17:20:00.000Z",
+        verificationUrl:
+          "http://localhost:3000/verify-email?token=development-token",
+      }),
+    });
+  });
+
+  await page.route("**/api/account/password", async (route) => {
+    const payload = JSON.parse(route.request().postData() ?? "{}") as {
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    expect(payload).toEqual({
+      currentPassword: "demo123",
+      newPassword: "NuevaClave2026",
+    });
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        message: "Contraseña actualizada correctamente",
+      }),
+    });
+  });
+
+  await page.goto("/login");
+  await page
+    .getByPlaceholder("12.345.678-9 o nombre@empresa.cl")
+    .fill(guardianRut);
+  await page.getByPlaceholder("Tu contraseña").fill("demo123");
+
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === "/"),
+    page.getByRole("button", { name: "Entrar al portal" }).click(),
+  ]);
+
+  await page.getByRole("button", { name: "Mi cuenta" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Información personal" }),
+  ).toBeVisible();
+  await expect(page.getByText("Sincronizado")).toBeVisible();
+
+  const personalSection = page.locator("[data-account-personal]");
+  await personalSection.getByLabel("Nuevo correo").fill("nuevo.correo@example.cl");
+  await personalSection.getByLabel("Contraseña actual").fill("demo123");
+  await personalSection
+    .getByRole("button", { name: "Verificar nuevo correo" })
+    .click();
+
+  await expect(
+    personalSection.getByText(
+      "Confirmación pendiente para nuevo.correo@example.cl",
+    ),
+  ).toBeVisible();
+  await expect(
+    personalSection.getByRole("link", { name: "Abrir confirmación local" }),
+  ).toBeVisible();
+
+  const securitySection = page.locator("[data-account-security]");
+  await securitySection.getByLabel("Contraseña actual").fill("demo123");
+  await securitySection
+    .getByLabel("Nueva contraseña", { exact: true })
+    .fill("NuevaClave2026");
+  await securitySection
+    .getByLabel("Repetir nueva contraseña")
+    .fill("NuevaClave2026");
+  await securitySection
+    .getByRole("button", { name: "Cambiar contraseña" })
+    .click();
+
+  await expect(page.getByText("Contraseña actualizada correctamente")).toBeVisible();
 });

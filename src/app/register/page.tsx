@@ -111,11 +111,14 @@ export default function RegisterPage() {
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                minLength={6}
+                minLength={8}
                 required
                 type="password"
                 className="h-full w-full bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-400"
               />
+            </span>
+            <span className="mt-2 block text-xs font-medium text-slate-500">
+              Usa al menos 8 caracteres, incluyendo una letra y un número.
             </span>
           </label>
 
