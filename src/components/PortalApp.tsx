@@ -49,6 +49,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
     guardian.students[0]?.id ?? "",
   );
   const [selectedCuotas, setSelectedCuotas] = useState<number[]>([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
   const [webpayRedirect, setWebpayRedirect] = useState<{
     url: string;
@@ -58,6 +59,27 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   const selectedStudent =
     guardian.students.find((student) => student.id === selectedStudentId) ??
     guardian.students[0];
+
+  const academicYears = new Map<number, string>();
+  for (const student of guardian.students) {
+    for (const installment of student.installments) {
+      if (installment.academicYear) {
+        academicYears.set(installment.academicYear.id, installment.academicYear.label);
+      }
+    }
+  }
+  const paymentStudents = selectedAcademicYear
+    ? guardian.students.flatMap((student) => {
+        const installments = student.installments.filter(
+          (installment) => String(installment.academicYear?.id) === selectedAcademicYear,
+        );
+        return installments.length ? [{
+          ...student,
+          course: installments[0].enrollmentCourse ?? student.course,
+          installments,
+        }] : [];
+      })
+    : guardian.students;
 
   function resetPaymentFlow() {
     setSelectedCuotas([]);
@@ -98,7 +120,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
       return;
     }
 
-    const selectedEntries = guardian.students.flatMap((student) =>
+    const selectedEntries = paymentStudents.flatMap((student) =>
       student.installments
         .filter(
           (installment) =>
@@ -114,7 +136,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
       ({ student, installment }) => ({
         installmentId: installment.id,
         studentName: student.name,
-        concept: "Mensualidad escolar",
+        concept: installment.concept ?? "Cuota escolar",
         month: installment.month,
         amount: installment.amount,
       }),
@@ -135,7 +157,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
         },
         body: JSON.stringify({
           amount: selectedTotal,
-          sessionId: `portal-multi-${Date.now()}`,
+          sessionId: `portal-multi-${crypto.randomUUID()}`,
           edupayPayload: selectedInstallments.map((installment) => installment.id),
           receiptItems,
         }),
@@ -234,7 +256,13 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
         <section className="mx-auto max-w-6xl">
         {activeSection === "account" && statement && (
           <AccountStatement
-            statement={statement}
+            statement={{ ...statement, students: paymentStudents }}
+            academicYears={[...academicYears].sort(([, left], [, right]) => right.localeCompare(left, "es"))}
+            selectedAcademicYear={selectedAcademicYear}
+            onSelectAcademicYear={(year) => {
+              setSelectedAcademicYear(year);
+              setSelectedCuotas([]);
+            }}
             selectedCuotas={selectedCuotas}
             isCreatingTransaction={isCreatingTransaction}
             onToggleInstallment={toggleInstallment}

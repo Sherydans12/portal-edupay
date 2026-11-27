@@ -34,7 +34,7 @@ Flujo esperado:
 4. Webpay retorna al portal o notifica la confirmacion.
 5. El BFF valida la transaccion contra Transbank antes de considerarla aprobada.
 6. Si la transaccion fue aprobada, el BFF marca la orden local como `APPROVED_PENDING_SYNC`.
-7. El BFF llama `POST /api/v1/payments/sync` en EduPay para registrar el pago institucional.
+7. El BFF llama `POST /api/v1/portal/payments/sync` en BL-002 para registrar el pago institucional. Cuotas, importes y año se consultan según los [contratos del portal](API_CONTRACTS.md).
 8. Si EduPay confirma, la orden queda `SYNCED` y se invalida el cache Redis del alumno.
 
 Estrategia de resiliencia:

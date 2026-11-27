@@ -4,6 +4,9 @@ export interface EdupayInstallment {
   id: number;
   month: string;
   dueDate: string;
+  academicYear?: { id: number; label: string };
+  enrollmentCourse?: string;
+  concept?: string;
   status: EdupayInstallmentStatus;
   amount: number;
   paidAt?: string;
@@ -211,10 +214,14 @@ type EdupayRawStatementResponse = {
     course: {
       id: number;
       name: string;
-    };
+    } | null;
     installments: Array<{
       id: number;
       month: string;
+      dueDate?: string | null;
+      academicYear?: EdupayInstallment["academicYear"] | null;
+      enrollmentCourse?: string | null;
+      concept?: { name: string | null } | null;
       amount: number;
       paidAmount: number;
       outstandingAmount: number;
@@ -413,12 +420,15 @@ export function getGuardianStatement(
     students: statement.students.map((student) => ({
       id: String(student.id),
       name: student.name,
-      course: student.course.name,
+      course: student.course?.name ?? "Curso por asignar",
       accountNumber: student.rut,
       installments: student.installments.map((installment) => ({
         id: installment.id,
         month: formatInstallmentMonth(installment.month),
-        dueDate: `${installment.month}-10`,
+        dueDate: installment.dueDate ?? `${installment.month}-10`,
+        academicYear: installment.academicYear ?? undefined,
+        enrollmentCourse: installment.enrollmentCourse ?? undefined,
+        concept: installment.concept?.name ?? undefined,
         status:
           installment.status === "PENDIENTE"
             ? "POR_VENCER"

@@ -22,6 +22,9 @@ type StudentSelectorProps = {
 
 type AccountStatementProps = {
   statement: EdupayStatementResponse;
+  academicYears: Array<[number, string]>;
+  selectedAcademicYear: string;
+  onSelectAcademicYear: (year: string) => void;
   selectedCuotas: number[];
   isCreatingTransaction: boolean;
   onToggleInstallment: (installment: Installment) => void;
@@ -100,6 +103,9 @@ export function StudentSelector({
 
 export function AccountStatement({
   statement,
+  academicYears,
+  selectedAcademicYear,
+  onSelectAcademicYear,
   selectedCuotas,
   isCreatingTransaction,
   onToggleInstallment,
@@ -134,6 +140,26 @@ export function AccountStatement({
           </p>
         )}
       </header>
+
+      {academicYears.length > 0 && (
+        <div className="mb-6 max-w-xs">
+          <label htmlFor="statement-academic-year" className="block text-sm font-bold text-slate-700">
+            Año académico
+          </label>
+          <select
+            id="statement-academic-year"
+            className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-tenant-primary"
+            value={selectedAcademicYear}
+            disabled={isCreatingTransaction}
+            onChange={(event) => onSelectAcademicYear(event.target.value)}
+          >
+            <option value="">Todos los años</option>
+            {academicYears.map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <section className="mb-6 overflow-hidden rounded-[14px] border border-slate-200 bg-white" aria-label="Proceso de pago">
         <div className="grid divide-y divide-slate-200 md:grid-cols-3 md:divide-x md:divide-y-0">
@@ -229,7 +255,7 @@ function StudentStatementCard({
         <div className="overflow-x-auto">
           <div className="hidden min-w-[760px] grid-cols-[56px_1fr_150px_130px_140px] border-b border-slate-100 bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-slate-500 md:grid">
             <span />
-            <span>Mensualidad</span>
+            <span>Concepto</span>
             <span>Vencimiento</span>
             <span>Estado</span>
             <span className="text-right">Monto</span>
@@ -281,9 +307,9 @@ function InstallmentRow({
       </span>
       <span className="hidden md:block">
         <span className="block font-bold text-slate-950">
-          {installment.month}
+          {installment.concept ?? "Cuota escolar"}
         </span>
-        <span className="text-sm text-slate-500">Mensualidad escolar</span>
+        <span className="text-sm text-slate-500">{installment.month}</span>
       </span>
       <span className="hidden text-sm font-medium text-slate-600 md:block">
         {formatDate(installment.dueDate)}
@@ -307,7 +333,7 @@ function InstallmentRow({
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="min-w-0 font-black text-slate-950">
-                Mensualidad {installment.month}
+                {installment.concept ?? "Cuota escolar"}
               </span>
               <StatusBadge status={installment.status} />
             </span>

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getPublicAppUrl } from "@/lib/app-url";
 import { logCriticalError } from "@/lib/critical-error";
-import { getEdupayTenantId } from "@/lib/edupay";
+import { getEdupayTenantId, getGuardianStatement } from "@/lib/edupay";
 import prisma from "@/lib/prisma";
 import {
   checkRateLimit,
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as InitWebpayBody;
   const amount = Number(body.amount);
-  const receiptItems = parseReceiptItems(body.receiptItems);
+  const requestedReceiptItems = parseReceiptItems(body.receiptItems);
 
   if (
     !Number.isInteger(amount) ||
@@ -76,12 +76,14 @@ export async function POST(request: Request) {
     typeof body.sessionId !== "string" ||
     body.sessionId.trim().length === 0 ||
     !Array.isArray(body.edupayPayload) ||
+    body.edupayPayload.length === 0 ||
+    new Set(body.edupayPayload).size !== body.edupayPayload.length ||
     !body.edupayPayload.every(
-      (id) => typeof id === "number" && Number.isInteger(id),
+      (id) => typeof id === "number" && Number.isInteger(id) && id > 0,
     ) ||
-    (body.receiptItems !== undefined && receiptItems === null) ||
-    (receiptItems !== null &&
-      !receiptItemsMatchPayment(receiptItems, body.edupayPayload, amount))
+    (body.receiptItems !== undefined && requestedReceiptItems === null) ||
+    (requestedReceiptItems !== null &&
+      !receiptItemsMatchPayment(requestedReceiptItems, body.edupayPayload, amount))
   ) {
     return NextResponse.json(
       { error: "Datos de pago inválidos" },
@@ -97,11 +99,38 @@ export async function POST(request: Request) {
     select: {
       id: true,
       tenantId: true,
+      rut: true,
     },
   });
 
   if (!guardian) {
     return NextResponse.json({ error: "Apoderado no encontrado" }, { status: 404 });
+  }
+
+  let receiptItems: PaymentReceiptItem[];
+  try {
+    const statement = await getGuardianStatement(guardian.rut);
+    const requestedIds = new Set(body.edupayPayload);
+    receiptItems = statement.students.flatMap((student) =>
+      student.installments
+        .filter((installment) =>
+          requestedIds.has(installment.id) && installment.status !== "PAGADO" && installment.amount > 0)
+        .map((installment) => ({
+          installmentId: installment.id,
+          studentName: student.name,
+          concept: installment.concept ?? "Cuota escolar",
+          month: installment.month,
+          amount: installment.amount,
+        })),
+    );
+  } catch (error) {
+    logCriticalError({ path: "/api/webpay/init/statement", error });
+    return NextResponse.json({ error: "No fue posible verificar las cuotas. Intenta nuevamente." }, { status: 502 });
+  }
+  if (!receiptItemsMatchPayment(receiptItems, body.edupayPayload, amount)) {
+    return NextResponse.json({
+      error: "Una cuota cambió o ya no está disponible. Actualiza tu estado de cuenta.",
+    }, { status: 409 });
   }
 
   const returnUrl = new URL(
@@ -136,7 +165,7 @@ export async function POST(request: Request) {
       amount,
       status: "PENDING",
       edupayPayload: body.edupayPayload,
-      receiptItems: receiptItems ?? undefined,
+      receiptItems,
     },
   });
 
