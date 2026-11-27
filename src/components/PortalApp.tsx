@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { AccountSettings } from "@/components/account/AccountSettings";
 import {
@@ -30,6 +30,7 @@ type PortalAppProps = {
 export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const guardian: Guardian = statement
     ? {
         ...statement.guardian,
@@ -50,6 +51,8 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   );
   const [selectedCuotas, setSelectedCuotas] = useState<number[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  const [checkoutConflict, setCheckoutConflict] = useState(false);
+  const [isRefreshing, startRefresh] = useTransition();
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
   const [webpayRedirect, setWebpayRedirect] = useState<{
     url: string;
@@ -68,10 +71,12 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
       }
     }
   }
-  const paymentStudents = selectedAcademicYear
+  const visibleAcademicYear = academicYears.has(Number(selectedAcademicYear))
+    ? selectedAcademicYear : "";
+  const paymentStudents = visibleAcademicYear
     ? guardian.students.flatMap((student) => {
         const installments = student.installments.filter(
-          (installment) => String(installment.academicYear?.id) === selectedAcademicYear,
+          (installment) => String(installment.academicYear?.id) === visibleAcademicYear,
         );
         return installments.length ? [{
           ...student,
@@ -104,7 +109,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   }
 
   function toggleInstallment(installment: Installment) {
-    if (installment.status === "PAGADO" || isCreatingTransaction) {
+    if (installment.status === "PAGADO" || isCreatingTransaction || isRefreshing) {
       return;
     }
 
@@ -116,7 +121,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   }
 
   async function startWebpayTransaction() {
-    if (isCreatingTransaction) {
+    if (isCreatingTransaction || checkoutConflict || isRefreshing) {
       return;
     }
 
@@ -164,6 +169,11 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
       });
 
       if (!response.ok) {
+        if (response.status === 409) {
+          setCheckoutConflict(true);
+          resetPaymentFlow();
+          return;
+        }
         const errorPayload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
@@ -258,13 +268,22 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
           <AccountStatement
             statement={{ ...statement, students: paymentStudents }}
             academicYears={[...academicYears].sort(([, left], [, right]) => right.localeCompare(left, "es"))}
-            selectedAcademicYear={selectedAcademicYear}
+            selectedAcademicYear={visibleAcademicYear}
             onSelectAcademicYear={(year) => {
               setSelectedAcademicYear(year);
               setSelectedCuotas([]);
             }}
             selectedCuotas={selectedCuotas}
-            isCreatingTransaction={isCreatingTransaction}
+            isCreatingTransaction={isCreatingTransaction || isRefreshing}
+            checkoutConflict={checkoutConflict}
+            onRefreshStatement={() => {
+              resetPaymentFlow();
+              startRefresh(() => {
+                router.refresh();
+                setCheckoutConflict(false);
+              });
+            }}
+            onShowPaymentHistory={() => handleSectionChange("history")}
             onToggleInstallment={toggleInstallment}
             onStartWebpayTransaction={startWebpayTransaction}
           />
