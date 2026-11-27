@@ -1,14 +1,12 @@
 "use client";
 
 import {
-  CalendarDays,
   CheckCircle,
   CheckCircle2,
   CircleAlert,
   CreditCard,
   GraduationCap,
   Loader2,
-  ShieldCheck,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { EdupayStatementResponse } from "@/lib/edupay";
@@ -22,8 +20,14 @@ type StudentSelectorProps = {
 
 type AccountStatementProps = {
   statement: EdupayStatementResponse;
+  academicYears: Array<[number, string]>;
+  selectedAcademicYear: string;
+  onSelectAcademicYear: (year: string) => void;
   selectedCuotas: number[];
   isCreatingTransaction: boolean;
+  checkoutConflict: boolean;
+  onRefreshStatement: () => void;
+  onShowPaymentHistory: () => void;
   onToggleInstallment: (installment: Installment) => void;
   onStartWebpayTransaction: () => void;
 };
@@ -100,8 +104,14 @@ export function StudentSelector({
 
 export function AccountStatement({
   statement,
+  academicYears,
+  selectedAcademicYear,
+  onSelectAcademicYear,
   selectedCuotas,
   isCreatingTransaction,
+  checkoutConflict,
+  onRefreshStatement,
+  onShowPaymentHistory,
   onToggleInstallment,
   onStartWebpayTransaction,
 }: AccountStatementProps) {
@@ -115,6 +125,8 @@ export function AccountStatement({
   );
   const selectedTotal = getDebt(selectedInstallments);
   const totalDebt = getDebt(allInstallments);
+  const pendingCount = allInstallments.filter(({ status, amount }) => status !== "PAGADO" && amount > 0).length;
+  const yearLabel = academicYears.find(([id]) => String(id) === selectedAcademicYear)?.[1];
   const hasMultipleStudents = statement.students.length > 1;
   const accountTitle =
     statement.students.length === 1
@@ -135,32 +147,59 @@ export function AccountStatement({
         )}
       </header>
 
-      <section className="mb-6 overflow-hidden rounded-[14px] border border-slate-200 bg-white" aria-label="Proceso de pago">
-        <div className="grid divide-y divide-slate-200 md:grid-cols-3 md:divide-x md:divide-y-0">
-          <JourneyStep icon={CircleAlert} title="Tu situación" description="Entiende el total y lo que requiere atención." active />
-          <JourneyStep icon={CalendarDays} title="Revisa por estudiante" description="Selecciona las cuotas que deseas resolver." />
-          <JourneyStep icon={ShieldCheck} title="Pago seguro" description="Confirma tu selección y paga con Webpay." />
+      {academicYears.length > 0 && (
+        <div className="mb-5 max-w-xs">
+          <label htmlFor="statement-academic-year" className="block text-sm font-bold text-slate-700">
+            Año académico
+          </label>
+          <select
+            id="statement-academic-year"
+            className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-tenant-primary"
+            value={selectedAcademicYear}
+            disabled={isCreatingTransaction}
+            onChange={(event) => onSelectAcademicYear(event.target.value)}
+          >
+            <option value="">Todos los años</option>
+            {academicYears.map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </select>
         </div>
-      </section>
+      )}
 
-      <section className="mb-7 grid overflow-hidden rounded-[14px] border border-slate-200 bg-white sm:grid-cols-3" aria-label="Resumen familiar">
-        <SummaryItem label={hasMultipleStudents ? "Deuda familiar" : "Deuda total"} value={formatCurrency(totalDebt)} />
-        <SummaryItem label="Pendiente por pagar" value={formatCurrency(totalDebt)} emphasis />
-        <SummaryItem label="Próximo vencimiento" value={getNextDueDate(allInstallments)} detail />
-      </section>
+      {checkoutConflict ? (
+        <div role="alert" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+          <p className="flex items-center gap-2 font-semibold"><CircleAlert className="h-5 w-5" aria-hidden />Cambió el saldo de una cuota.</p>
+          <p className="mt-1 text-sm">Actualiza el estado de cuenta antes de volver a seleccionar las cuotas.</p>
+          <button type="button" onClick={onRefreshStatement} disabled={isCreatingTransaction}
+            className="mt-2 min-h-11 rounded-lg px-2 text-sm font-semibold underline underline-offset-2 focus-visible:outline-2">
+            Actualizar estado de cuenta
+          </button>
+        </div>
+      ) : null}
+
+      {pendingCount > 0 ? (
+        <section className="mb-5 grid overflow-hidden rounded-[14px] border border-slate-200 bg-white sm:grid-cols-3" aria-label={yearLabel ? `Resumen de ${yearLabel}` : "Resumen de todos los años"}>
+          <SummaryItem label={yearLabel ? `Pendiente en ${yearLabel}` : "Pendiente de todos los años"} value={formatCurrency(totalDebt)} emphasis />
+          <SummaryItem label="Cuotas por pagar" value={String(pendingCount)} />
+          <SummaryItem label="Vencimiento de la primera cuota pendiente" value={getNextDueDate(allInstallments)} detail />
+        </section>
+      ) : null}
 
       <div>
         {statement.students.length === 0 ? (
           <EmptyStudents />
-        ) : totalDebt === 0 ? (
-          <EmptyDebtState />
+        ) : allInstallments.length === 0 ? (
+          <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-700">El colegio aún no ha publicado cuotas para esta cuenta.</p>
+        ) : pendingCount === 0 ? (
+          <EmptyDebtState yearLabel={yearLabel} onShowPaymentHistory={onShowPaymentHistory} />
         ) : (
           statement.students.map((student) => (
             <StudentStatementCard
               key={student.id}
               student={student}
               selectedCuotas={selectedCuotas}
-              isCreatingTransaction={isCreatingTransaction}
+              isCreatingTransaction={isCreatingTransaction || checkoutConflict}
               onToggleInstallment={onToggleInstallment}
             />
           ))
@@ -168,7 +207,7 @@ export function AccountStatement({
       </div>
 
       <PaymentBar
-        isVisible={hasSelectedCuotas}
+        isVisible={hasSelectedCuotas && !checkoutConflict}
         selectedCount={selectedInstallments.length}
         selectedTotal={selectedTotal}
         isCreatingTransaction={isCreatingTransaction}
@@ -227,9 +266,9 @@ function StudentStatementCard({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <div className="hidden min-w-[760px] grid-cols-[56px_1fr_150px_130px_140px] border-b border-slate-100 bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-slate-500 md:grid">
+          <div className="hidden min-w-[760px] grid-cols-[56px_1fr_150px_130px_140px] border-b border-slate-100 bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-slate-500 xl:grid">
             <span />
-            <span>Mensualidad</span>
+            <span>Concepto</span>
             <span>Vencimiento</span>
             <span>Estado</span>
             <span className="text-right">Monto</span>
@@ -265,13 +304,13 @@ function InstallmentRow({
 
   return (
     <label
-      className={`block border-b border-slate-100 px-4 py-4 transition last:border-none md:grid md:min-w-[760px] md:grid-cols-[56px_1fr_150px_130px_140px] md:items-center md:gap-3 ${
+      className={`block border-b border-slate-100 px-4 py-4 transition last:border-none xl:grid xl:min-w-[760px] xl:grid-cols-[56px_1fr_150px_130px_140px] xl:items-center xl:gap-3 ${
         isPaid
           ? "cursor-not-allowed bg-slate-50 opacity-60"
           : "cursor-pointer bg-white hover:bg-[#fffdf7]"
       }`}
     >
-      <span className="hidden items-center md:flex">
+      <span className="hidden items-center xl:flex">
         <InstallmentCheckbox
           installment={installment}
           isSelected={isSelected}
@@ -279,23 +318,23 @@ function InstallmentRow({
           onToggleInstallment={onToggleInstallment}
         />
       </span>
-      <span className="hidden md:block">
+      <span className="hidden xl:block">
         <span className="block font-bold text-slate-950">
-          {installment.month}
+          {installment.concept ?? "Cuota escolar"}
         </span>
-        <span className="text-sm text-slate-500">Mensualidad escolar</span>
+        <span className="text-sm text-slate-600">{installment.academicYear ? `Año académico ${installment.academicYear.label}` : installment.month}</span>
       </span>
-      <span className="hidden text-sm font-medium text-slate-600 md:block">
+      <span className="hidden text-sm font-medium text-slate-600 xl:block">
         {formatDate(installment.dueDate)}
       </span>
-      <span className="hidden md:block">
+      <span className="hidden xl:block">
         <StatusBadge status={installment.status} />
       </span>
-      <span className="hidden text-left text-base font-black text-slate-950 md:block md:text-right">
+      <span className="hidden text-left text-base font-black text-slate-950 xl:block xl:text-right">
         {formatCurrency(installment.amount)}
       </span>
 
-      <span className="md:hidden">
+      <span className="xl:hidden">
         <span className="flex items-start gap-3">
           <InstallmentCheckbox
             installment={installment}
@@ -307,10 +346,11 @@ function InstallmentRow({
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="min-w-0 font-black text-slate-950">
-                Mensualidad {installment.month}
+                {installment.concept ?? "Cuota escolar"}
               </span>
               <StatusBadge status={installment.status} />
             </span>
+            {installment.academicYear ? <span className="mt-1 block text-xs text-slate-600">Año académico {installment.academicYear.label}</span> : null}
             <span className="mt-3 grid grid-cols-2 gap-3 text-sm">
               <span>
                 <span className="block text-xs font-bold uppercase tracking-[0.1em] text-slate-400">
@@ -354,6 +394,7 @@ function InstallmentCheckbox({
   return (
     <input
       type="checkbox"
+      aria-label={`Seleccionar ${installment.concept ?? "cuota escolar"} ${installment.academicYear?.label ?? installment.month}`}
       checked={isSelected}
       disabled={isPaid || isCreatingTransaction}
       onChange={() => onToggleInstallment(installment)}
@@ -384,19 +425,21 @@ function EmptyStudents() {
   );
 }
 
-function EmptyDebtState() {
+function EmptyDebtState({ yearLabel, onShowPaymentHistory }: { yearLabel?: string; onShowPaymentHistory: () => void }) {
   return (
     <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-5 py-12 text-center shadow-sm sm:px-8">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-emerald-600 shadow-sm">
         <CheckCircle2 className="h-9 w-9" aria-hidden />
       </div>
       <h2 className="mt-5 text-xl font-black text-emerald-900">
-        ¡Al día! No registras deudas pendientes.
+        {yearLabel ? `Tus cuotas de ${yearLabel} están al día` : "Tus cuotas están al día"}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-emerald-800/80">
-        Tus cuotas están pagadas. Aquí podrás ver nuevas obligaciones cuando
-        sean registradas por el colegio.
+        Consulta tus pagos y comprobantes en el historial.
       </p>
+      <button type="button" onClick={onShowPaymentHistory} className="mt-3 min-h-11 rounded-lg px-3 text-sm font-semibold text-tenant-primary underline underline-offset-2 focus-visible:outline-2">
+        Ver historial de pagos
+      </button>
     </div>
   );
 }
@@ -476,20 +519,6 @@ function PaymentBar({
   );
 }
 
-function JourneyStep({ icon: Icon, title, description, active = false }: { icon: typeof CircleAlert; title: string; description: string; active?: boolean }) {
-  return (
-    <div className={`flex items-start gap-3 p-4 sm:p-5 ${active ? "bg-[#fffaf0]" : "bg-white"}`}>
-      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${active ? "bg-tenant-secondary text-tenant-primary" : "bg-tenant-primary/8 text-tenant-primary"}`}>
-        <Icon className="h-4.5 w-4.5" aria-hidden />
-      </span>
-      <div>
-        <h2 className="text-sm font-black text-tenant-primary">{title}</h2>
-        <p className="mt-0.5 text-xs leading-5 text-slate-600">{description}</p>
-      </div>
-    </div>
-  );
-}
-
 function SummaryItem({ label, value, emphasis = false, detail = false }: { label: string; value: string; emphasis?: boolean; detail?: boolean }) {
   return (
     <div className={`p-5 sm:p-6 ${emphasis ? "bg-[#fffaf0]" : "bg-white"}`}>
@@ -500,8 +529,14 @@ function SummaryItem({ label, value, emphasis = false, detail = false }: { label
 }
 
 function getNextDueDate(installments: Installment[]) {
-  const next = installments.find((installment) => installment.status !== "PAGADO");
-  return next ? formatDate(next.dueDate) : "Sin cuotas pendientes";
+  let earliest: string | undefined;
+  for (const installment of installments) {
+    if (installment.status !== "PAGADO" && installment.amount > 0 &&
+      (!earliest || installment.dueDate < earliest)) {
+      earliest = installment.dueDate;
+    }
+  }
+  return earliest ? formatDate(earliest) : "Sin cuotas pendientes";
 }
 
 export function getDebt(installments: Installment[]) {

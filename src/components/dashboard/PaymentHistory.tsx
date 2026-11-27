@@ -135,7 +135,7 @@ export function PaymentHistory({ student }: PaymentHistoryProps) {
               </span>
               <span>
                 <span className="block font-black text-slate-950">
-                  Mensualidad {installment.month}
+                  {installment.concept ?? "Cuota escolar"} · {installment.month}
                 </span>
                 <span className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
                   <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
@@ -296,7 +296,7 @@ function PaymentReceiptModal({
                   <tbody>
                     <tr>
                       <td className="px-4 py-3 font-bold text-slate-900">{studentName}</td>
-                      <td className="px-4 py-3 text-slate-600">Mensualidad escolar</td>
+                      <td className="px-4 py-3 text-slate-600">{installment.concept ?? "Cuota escolar"}</td>
                       <td className="px-4 py-3 text-slate-600">{installment.month}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(installment.amount)}</td>
                     </tr>
@@ -332,7 +332,7 @@ function PaymentReceiptModal({
                       items: [
                         {
                           studentName,
-                          concept: "Mensualidad escolar",
+                          concept: installment.concept ?? "Cuota escolar",
                           month: installment.month,
                           amount: installment.amount,
                         },

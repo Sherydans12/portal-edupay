@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { AccountSettings } from "@/components/account/AccountSettings";
 import {
@@ -30,6 +30,7 @@ type PortalAppProps = {
 export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const guardian: Guardian = statement
     ? {
         ...statement.guardian,
@@ -49,6 +50,9 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
     guardian.students[0]?.id ?? "",
   );
   const [selectedCuotas, setSelectedCuotas] = useState<number[]>([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+  const [checkoutConflict, setCheckoutConflict] = useState(false);
+  const [isRefreshing, startRefresh] = useTransition();
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
   const [webpayRedirect, setWebpayRedirect] = useState<{
     url: string;
@@ -58,6 +62,29 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   const selectedStudent =
     guardian.students.find((student) => student.id === selectedStudentId) ??
     guardian.students[0];
+
+  const academicYears = new Map<number, string>();
+  for (const student of guardian.students) {
+    for (const installment of student.installments) {
+      if (installment.academicYear) {
+        academicYears.set(installment.academicYear.id, installment.academicYear.label);
+      }
+    }
+  }
+  const visibleAcademicYear = academicYears.has(Number(selectedAcademicYear))
+    ? selectedAcademicYear : "";
+  const paymentStudents = visibleAcademicYear
+    ? guardian.students.flatMap((student) => {
+        const installments = student.installments.filter(
+          (installment) => String(installment.academicYear?.id) === visibleAcademicYear,
+        );
+        return installments.length ? [{
+          ...student,
+          course: installments[0].enrollmentCourse ?? student.course,
+          installments,
+        }] : [];
+      })
+    : guardian.students;
 
   function resetPaymentFlow() {
     setSelectedCuotas([]);
@@ -82,7 +109,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   }
 
   function toggleInstallment(installment: Installment) {
-    if (installment.status === "PAGADO" || isCreatingTransaction) {
+    if (installment.status === "PAGADO" || isCreatingTransaction || isRefreshing) {
       return;
     }
 
@@ -94,11 +121,11 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
   }
 
   async function startWebpayTransaction() {
-    if (isCreatingTransaction) {
+    if (isCreatingTransaction || checkoutConflict || isRefreshing) {
       return;
     }
 
-    const selectedEntries = guardian.students.flatMap((student) =>
+    const selectedEntries = paymentStudents.flatMap((student) =>
       student.installments
         .filter(
           (installment) =>
@@ -114,7 +141,7 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
       ({ student, installment }) => ({
         installmentId: installment.id,
         studentName: student.name,
-        concept: "Mensualidad escolar",
+        concept: installment.concept ?? "Cuota escolar",
         month: installment.month,
         amount: installment.amount,
       }),
@@ -135,13 +162,18 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
         },
         body: JSON.stringify({
           amount: selectedTotal,
-          sessionId: `portal-multi-${Date.now()}`,
+          sessionId: `portal-multi-${crypto.randomUUID()}`,
           edupayPayload: selectedInstallments.map((installment) => installment.id),
           receiptItems,
         }),
       });
 
       if (!response.ok) {
+        if (response.status === 409) {
+          setCheckoutConflict(true);
+          resetPaymentFlow();
+          return;
+        }
         const errorPayload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
@@ -234,9 +266,24 @@ export function PortalApp({ statement, guardianRut }: PortalAppProps) {
         <section className="mx-auto max-w-6xl">
         {activeSection === "account" && statement && (
           <AccountStatement
-            statement={statement}
+            statement={{ ...statement, students: paymentStudents }}
+            academicYears={[...academicYears].sort(([, left], [, right]) => right.localeCompare(left, "es"))}
+            selectedAcademicYear={visibleAcademicYear}
+            onSelectAcademicYear={(year) => {
+              setSelectedAcademicYear(year);
+              setSelectedCuotas([]);
+            }}
             selectedCuotas={selectedCuotas}
-            isCreatingTransaction={isCreatingTransaction}
+            isCreatingTransaction={isCreatingTransaction || isRefreshing}
+            checkoutConflict={checkoutConflict}
+            onRefreshStatement={() => {
+              resetPaymentFlow();
+              startRefresh(() => {
+                router.refresh();
+                setCheckoutConflict(false);
+              });
+            }}
+            onShowPaymentHistory={() => handleSectionChange("history")}
             onToggleInstallment={toggleInstallment}
             onStartWebpayTransaction={startWebpayTransaction}
           />

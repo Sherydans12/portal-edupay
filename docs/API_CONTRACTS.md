@@ -1,101 +1,27 @@
-# Contratos Esperados EduPay
+# Contratos del Portal con BL-002
 
-Este documento define un borrador inicial de los endpoints que el Portal de Pagos Institucional espera consumir desde EduPay. Los nombres, campos y codigos finales deben validarse con el equipo proveedor.
+El BFF del portal consume `EDUPAY_API_URL` desde el servidor. Envía `Authorization: Bearer <EDUPAY_API_TOKEN>` y `x-tenant-id` del colegio. El navegador opera contra el portal con su sesión de apoderado.
 
-## Autenticacion
+## Estado de cuenta
 
-Todas las llamadas desde el BFF hacia EduPay usaran token servidor a servidor.
+`GET /api/v1/portal/guardian/{rut}` valida el apoderado del tenant. `GET /api/v1/portal/guardian/{rut}/statement` devuelve el apoderado y sus alumnos con los cargos vigentes. La respuesta de BL usa el sobre `{ data: ... }`.
 
-```http
-Authorization: Bearer ${EDUPAY_API_TOKEN}
-Content-Type: application/json
-```
+| Campo de cada cuota | Uso |
+|---|---|
+| `id` | ID numérico del cargo en BL-002. |
+| `academicYear.id`, `academicYear.label` | Año de la matrícula asociada al cargo. El selector del portal usa este ID. |
+| `enrollmentCourse` | Nombre del curso correspondiente a esa matrícula. |
+| `dueDate`, `month` | Vencimiento calendario ISO y mes de presentación. Una matrícula 2027 puede vencer en 2026. |
+| `concept.name` | Nombre que configuró el colegio, por ejemplo «Matrícula». |
+| `amount`, `paidAmount`, `outstandingAmount` | Importes en CLP y saldo calculado por BL. |
+| `status` | `PAGADO`, `VENCIDO` o `PENDIENTE`. La vista actual muestra `PENDIENTE` como cuota por vencer. |
 
-## GET /api/v1/students/:rut/debts
+El selector muestra los años presentes en los cargos del apoderado. Las cuotas sin datos de año, procedentes de una versión anterior de BL BACK, permanecen visibles en **Todos los años**. El año de los cargos se toma de la matrícula; el vencimiento permanece como dato independiente.
 
-Obtiene alumnos vinculados a un apoderado y sus deudas vigentes.
+BL-002 administra el concepto, monto, vencimiento y emisión de cargos. Al seleccionar **Emitir matrícula por año** en BL quedan disponibles los cargos de alumnos con apoderado y matrícula vigente para ese año. El portal muestra lo emitido, incluso si el año sigue en borrador académico. Para la operación del colegio, consulta [Matrícula 2027 y portal en BL-002](https://github.com/Sherydans12/BL-002-EduPay/blob/main/docs/operations/MATRICULA-2027-PORTAL.md).
 
-Parametros:
+## Inicio y confirmación del pago
 
-- `rut`: RUT del apoderado autenticado, normalizado sin puntos y con guion.
-
-Respuesta esperada:
-
-```json
-{
-  "guardian": {
-    "rut": "11111111-1",
-    "name": "Nombre Apoderado"
-  },
-  "students": [
-    {
-      "id": "stu_001",
-      "rut": "22222222-2",
-      "name": "Nombre Alumno",
-      "course": "4 Basico A",
-      "accountNumber": "CC-2026-001",
-      "installments": [
-        {
-          "id": "ins_001",
-          "month": "Marzo",
-          "dueDate": "2026-03-10",
-          "amount": 95000,
-          "currency": "CLP",
-          "status": "VENCIDO"
-        }
-      ]
-    }
-  ]
-}
-```
-
-Estados soportados:
-
-- `PAGADO`
-- `VENCIDO`
-- `POR_VENCER`
-
-## POST /api/v1/payments/sync
-
-Sincroniza en EduPay un pago aprobado y validado previamente por Webpay.
-
-Request:
-
-```json
-{
-  "buyOrder": "OC-12345678",
-  "amount": 190000,
-  "paymentMethod": "WEBPAY",
-  "authorizationCode": "AUTH-123456",
-  "cardNumber": "6623",
-  "chargeIds": [101, 102]
-}
-```
-
-Respuesta exitosa:
-
-```json
-{
-  "status": "SYNCED",
-  "edupayPaymentId": "edp_pay_001",
-  "syncedAt": "2026-06-23T15:30:05.000Z"
-}
-```
-
-Respuesta idempotente:
-
-```json
-{
-  "status": "ALREADY_SYNCED",
-  "edupayPaymentId": "edp_pay_001",
-  "syncedAt": "2026-06-23T15:30:05.000Z"
-}
-```
-
-## Requisitos Transversales
-
-- `portalPaymentId` debe ser idempotente.
-- EduPay debe rechazar pagos duplicados para las mismas cuotas si ya fueron saldadas.
-- Los errores transitorios deben responder con `408`, `429` o `5xx` para activar reintentos.
-- Los errores permanentes deben responder con `4xx` y un codigo funcional claro.
-- Todas las fechas se intercambian en ISO 8601 UTC.
+1. `POST /api/webpay/init` recibe los identificadores seleccionados y el total visto en pantalla. Vuelve a consultar el estado de cuenta del apoderado autenticado. Si los cargos o el saldo cambiaron, responde `409` antes de iniciar Webpay. El comprobante se arma con los conceptos e importes que devuelve BL.
+2. Tras confirmar un pago en Webpay, el portal envía `POST /api/v1/portal/payments/sync` a BL. Envía `buyOrder`, `amount`, `paymentMethod: "WEBPAY"`, los `chargeIds` y los datos opcionales de confirmación. BL valida el monto contra el saldo y aplica la orden de forma idempotente por tenant y orden.
+3. La respuesta incluye `synced`, `alreadyProcessed`, `buyOrder`, `paymentGroupId`, `amount` y `chargeIds`. El portal conserva los intentos fallidos para reintento.
